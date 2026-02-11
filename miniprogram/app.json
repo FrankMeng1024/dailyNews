@@ -1,0 +1,44 @@
+{
+  "pages": [
+    "pages/news/news",
+    "pages/audio/audio",
+    "pages/settings/settings"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarTitleText": "AI News",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5F5F7"
+  },
+  "tabBar": {
+    "color": "#86868B",
+    "selectedColor": "#007AFF",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/news/news",
+        "text": "News",
+        "iconPath": "images/icons/news.png",
+        "selectedIconPath": "images/icons/news-active.png"
+      },
+      {
+        "pagePath": "pages/audio/audio",
+        "text": "Audio",
+        "iconPath": "images/icons/audio.png",
+        "selectedIconPath": "images/icons/audio-active.png"
+      },
+      {
+        "pagePath": "pages/settings/settings",
+        "text": "Settings",
+        "iconPath": "images/icons/settings.png",
+        "selectedIconPath": "images/icons/settings-active.png"
+      }
+    ]
+  },
+  "darkmode": true,
+  "themeLocation": "theme.json",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

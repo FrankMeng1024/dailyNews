@@ -1,0 +1,37 @@
+# FastAPI and server
+fastapi==0.103.0
+uvicorn[standard]==0.23.2
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.20
+pymysql==1.1.0
+aiosqlite==0.19.0
+alembic==1.11.3
+
+# HTTP client
+httpx==0.24.1
+aiohttp==3.8.5
+
+# Validation and serialization
+pydantic==2.3.0
+pydantic-settings==2.0.3
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib==1.7.4
+bcrypt==4.0.1
+
+# Scheduling
+apscheduler==3.10.4
+
+# Audio processing
+pydub==0.25.1
+
+# Utilities
+python-dotenv==1.0.0
+pytz==2023.3
+
+# Testing
+pytest==7.4.0
+pytest-asyncio==0.21.1

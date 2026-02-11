@@ -1,0 +1,113 @@
+<view class="container {{theme}}">
+  <!-- Header -->
+  <view class="header">
+    <text class="header-title">Settings</text>
+  </view>
+
+  <scroll-view scroll-y class="settings-content">
+    <!-- Auto-fetch Schedule Section -->
+    <view class="section">
+      <text class="section-title">Auto-fetch Schedule</text>
+      <text class="section-desc">Select hours for automatic news fetching (Beijing time)</text>
+
+      <view class="hours-grid">
+        <view
+          wx:for="{{hours}}"
+          wx:key="*this"
+          class="hour-item {{selectedHours.includes(item.toString()) ? 'selected' : ''}}"
+          bindtap="onHourToggle"
+          data-hour="{{item}}"
+        >
+          <text>{{item < 10 ? '0' + item : item}}:00</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Importance Threshold Section -->
+    <view class="section">
+      <text class="section-title">News Importance Threshold</text>
+      <text class="section-desc">Only fetch news above this importance level</text>
+
+      <view class="slider-container">
+        <text class="slider-label">Low</text>
+        <slider
+          class="threshold-slider"
+          value="{{thresholdPercent}}"
+          min="0"
+          max="100"
+          step="5"
+          activeColor="#007AFF"
+          backgroundColor="#E5E5EA"
+          block-size="24"
+          bindchange="onThresholdChange"
+        />
+        <text class="slider-label">High</text>
+      </view>
+      <text class="threshold-value">{{thresholdPercent}}%</text>
+    </view>
+
+    <!-- Theme Section -->
+    <view class="section">
+      <text class="section-title">Theme</text>
+
+      <view class="theme-options">
+        <view
+          wx:for="{{themeOptions}}"
+          wx:key="value"
+          class="theme-option {{selectedTheme === item.value ? 'selected' : ''}}"
+          bindtap="onThemeChange"
+          data-theme="{{item.value}}"
+        >
+          <view class="theme-icon {{item.value}}">
+            <image src="/images/icons/{{item.icon}}.png" class="icon-small" mode="aspectFit"/>
+          </view>
+          <text>{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Audio Language Section -->
+    <view class="section">
+      <text class="section-title">Audio Language</text>
+      <text class="section-desc">Default language for generated audio</text>
+
+      <view class="language-options">
+        <view
+          wx:for="{{languageOptions}}"
+          wx:key="value"
+          class="language-option {{selectedLanguage === item.value ? 'selected' : ''}}"
+          bindtap="onLanguageChange"
+          data-language="{{item.value}}"
+        >
+          <text class="language-label">{{item.label}}</text>
+          <text class="language-desc">{{item.desc}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- About Section -->
+    <view class="section">
+      <text class="section-title">About</text>
+
+      <view class="about-item">
+        <text class="about-label">Version</text>
+        <text class="about-value">1.0.0</text>
+      </view>
+
+      <view class="about-item" bindtap="onFeedback">
+        <text class="about-label">Feedback</text>
+        <image src="/images/icons/chevron-right.png" class="icon-small" mode="aspectFit"/>
+      </view>
+    </view>
+
+    <!-- Save Button -->
+    <view class="save-section">
+      <view
+        class="btn btn-primary {{saving ? 'disabled' : ''}}"
+        bindtap="onSave"
+      >
+        <text>{{saving ? 'Saving...' : 'Save Settings'}}</text>
+      </view>
+    </view>
+  </scroll-view>
+</view>

@@ -1,0 +1,259 @@
+/* Settings Page Styles */
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  background: #FFFFFF;
+}
+
+.dark .header {
+  background: #000000;
+}
+
+.header-title {
+  font-size: 48rpx;
+  font-weight: 700;
+}
+
+/* Settings Content */
+.settings-content {
+  height: calc(100vh - 140rpx);
+}
+
+/* Section */
+.section {
+  background: #FFFFFF;
+  margin: 24rpx;
+  padding: 28rpx;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.dark .section {
+  background: #1C1C1E;
+  box-shadow: none;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+  display: block;
+}
+
+.section-desc {
+  font-size: 24rpx;
+  color: #86868B;
+  margin-bottom: 24rpx;
+  display: block;
+}
+
+.dark .section-desc {
+  color: #98989D;
+}
+
+/* Hours Grid */
+.hours-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+}
+
+.hour-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72rpx;
+  background: #F5F5F7;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #86868B;
+  transition: all 0.2s;
+}
+
+.dark .hour-item {
+  background: #2C2C2E;
+  color: #98989D;
+}
+
+.hour-item.selected {
+  background: #007AFF;
+  color: #FFFFFF;
+}
+
+.dark .hour-item.selected {
+  background: #0A84FF;
+}
+
+/* Slider */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.slider-label {
+  font-size: 24rpx;
+  color: #86868B;
+  white-space: nowrap;
+}
+
+.threshold-slider {
+  flex: 1;
+}
+
+.threshold-value {
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #007AFF;
+  margin-top: 16rpx;
+  display: block;
+}
+
+.dark .threshold-value {
+  color: #0A84FF;
+}
+
+/* Theme Options */
+.theme-options {
+  display: flex;
+  gap: 16rpx;
+}
+
+.theme-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24rpx 16rpx;
+  background: #F5F5F7;
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+}
+
+.dark .theme-option {
+  background: #2C2C2E;
+}
+
+.theme-option.selected {
+  border-color: #007AFF;
+  background: rgba(0, 122, 255, 0.1);
+}
+
+.dark .theme-option.selected {
+  border-color: #0A84FF;
+  background: rgba(10, 132, 255, 0.2);
+}
+
+.theme-icon {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-bottom: 12rpx;
+}
+
+.theme-icon.light {
+  background: #FFFFFF;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.theme-icon.dark {
+  background: #1C1C1E;
+}
+
+.theme-icon.system {
+  background: linear-gradient(135deg, #FFFFFF 50%, #1C1C1E 50%);
+}
+
+.theme-option text {
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+/* Language Options */
+.language-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.language-option {
+  display: flex;
+  flex-direction: column;
+  padding: 20rpx 24rpx;
+  background: #F5F5F7;
+  border-radius: 12rpx;
+  border: 2rpx solid transparent;
+}
+
+.dark .language-option {
+  background: #2C2C2E;
+}
+
+.language-option.selected {
+  border-color: #007AFF;
+  background: rgba(0, 122, 255, 0.1);
+}
+
+.dark .language-option.selected {
+  border-color: #0A84FF;
+  background: rgba(10, 132, 255, 0.2);
+}
+
+.language-label {
+  font-size: 28rpx;
+  font-weight: 500;
+  margin-bottom: 4rpx;
+}
+
+.language-desc {
+  font-size: 24rpx;
+  color: #86868B;
+}
+
+.dark .language-desc {
+  color: #98989D;
+}
+
+/* About Section */
+.about-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #E5E5EA;
+}
+
+.dark .about-item {
+  border-bottom-color: #38383A;
+}
+
+.about-item:last-child {
+  border-bottom: none;
+}
+
+.about-label {
+  font-size: 28rpx;
+}
+
+.about-value {
+  font-size: 28rpx;
+  color: #86868B;
+}
+
+/* Save Section */
+.save-section {
+  padding: 32rpx 24rpx;
+  padding-bottom: calc(32rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+}
+
+.btn.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

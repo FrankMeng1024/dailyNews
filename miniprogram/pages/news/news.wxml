@@ -1,0 +1,118 @@
+<view class="container {{theme}}">
+  <!-- Header -->
+  <view class="header">
+    <text class="header-title">AI News</text>
+    <view class="header-action" bindtap="onManualFetch">
+      <image
+        src="/images/icons/refresh.png"
+        class="icon {{refreshing ? 'rotating' : ''}}"
+        mode="aspectFit"
+      />
+    </view>
+  </view>
+
+  <!-- Fetch Progress Banner -->
+  <view wx:if="{{fetchStatus && fetchStatus !== 'completed'}}" class="fetch-progress">
+    <view class="progress-content">
+      <view class="progress-spinner"></view>
+      <text class="progress-text">{{fetchProgress}}</text>
+    </view>
+  </view>
+
+  <!-- News List -->
+  <scroll-view
+    scroll-y
+    class="news-list"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+  >
+    <!-- News Cards -->
+    <view
+      wx:for="{{newsList}}"
+      wx:key="id"
+      class="news-card"
+      bindtap="onNewsClick"
+      data-id="{{item.id}}"
+    >
+      <view class="news-content">
+        <view class="news-header">
+          <text class="news-source">{{item.source_name}}</text>
+          <text class="news-time">{{item.relativeTime}}</text>
+        </view>
+        <text class="news-title">{{item.title}}</text>
+        <view class="news-footer">
+          <view
+            class="importance-badge"
+            style="background: {{item.importanceColor}}20; color: {{item.importanceColor}}"
+          >
+            {{item.importanceLabel}}
+          </view>
+        </view>
+      </view>
+      <image
+        wx:if="{{item.image_url}}"
+        src="{{item.image_url}}"
+        class="news-image"
+        mode="aspectFill"
+      />
+    </view>
+
+    <!-- Loading -->
+    <view wx:if="{{loading && newsList.length > 0}}" class="loading">
+      <text>Loading more...</text>
+    </view>
+
+    <!-- No more -->
+    <view wx:if="{{!hasMore && newsList.length > 0}}" class="no-more">
+      <text class="caption">No more news</text>
+    </view>
+
+    <!-- Empty state -->
+    <view wx:if="{{!loading && newsList.length === 0}}" class="empty">
+      <image src="/images/icons/news.png" class="empty-icon" mode="aspectFit"/>
+      <text class="empty-text">No news yet</text>
+      <text class="empty-text caption">Tap refresh to fetch latest AI news</text>
+    </view>
+  </scroll-view>
+
+  <!-- News Detail Modal -->
+  <view wx:if="{{showDetail}}" class="modal-overlay" bindtap="onDetailClose">
+    <view class="modal-content" catchtap="">
+      <view class="modal-header">
+        <view class="modal-close" bindtap="onDetailClose">
+          <image src="/images/icons/close.png" class="icon" mode="aspectFit"/>
+        </view>
+      </view>
+
+      <scroll-view scroll-y class="modal-body">
+        <image
+          wx:if="{{selectedNews.image_url}}"
+          src="{{selectedNews.image_url}}"
+          class="detail-image"
+          mode="aspectFill"
+        />
+
+        <view class="detail-meta">
+          <text class="detail-source">{{selectedNews.source_name}}</text>
+          <text class="detail-time">{{selectedNews.relativeTime}}</text>
+        </view>
+
+        <text class="detail-title">{{selectedNews.title}}</text>
+
+        <view wx:if="{{selectedNews.author}}" class="detail-author">
+          <text class="caption">By {{selectedNews.author}}</text>
+        </view>
+
+        <view class="detail-content">
+          <text>{{selectedNews.summary || selectedNews.content || 'No content available'}}</text>
+        </view>
+
+        <view class="detail-actions">
+          <view class="btn btn-secondary" bindtap="onOpenSource">
+            <text>Copy Source Link</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</view>
