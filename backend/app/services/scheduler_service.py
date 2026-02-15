@@ -1,7 +1,9 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.jobstores.memory import MemoryJobStore
 from typing import List, Optional
+from datetime import datetime
 import pytz
 import logging
 
@@ -26,6 +28,16 @@ class SchedulerService:
             self.scheduler.start()
             self._is_running = True
             logger.info("Scheduler started")
+
+            # Add GLM retry job (runs every minute)
+            self.scheduler.add_job(
+                self._retry_glm_content_task,
+                trigger=IntervalTrigger(minutes=1),
+                id="glm_retry_task",
+                replace_existing=True,
+                name="Retry GLM content generation"
+            )
+            logger.info("Added GLM retry job (every 1 minute)")
 
     def shutdown(self):
         """Shutdown the scheduler"""
@@ -147,6 +159,45 @@ class SchedulerService:
 
         except Exception as e:
             logger.error(f"Error in scheduled fetch: {str(e)}")
+        finally:
+            db.close()
+
+    async def _retry_glm_content_task(self):
+        """
+        Background task to retry GLM content generation for failed news items.
+        Runs every minute, processes news where:
+        - content_status = 'pending'
+        - glm_next_retry_at <= now
+        - glm_retry_count < 5
+        """
+        from app.database import SessionLocal
+        from app.services.news_fetcher import news_fetcher
+        from app.models.news import News
+
+        db = SessionLocal()
+        try:
+            now = datetime.utcnow()
+
+            # Find news items ready for retry
+            retry_news = db.query(News).filter(
+                News.content_status == "pending",
+                News.glm_next_retry_at != None,
+                News.glm_next_retry_at <= now,
+                News.glm_retry_count < 5
+            ).limit(10).all()
+
+            if not retry_news:
+                return
+
+            news_ids = [n.id for n in retry_news]
+            logger.info(f"Retrying GLM content for {len(news_ids)} news items: {news_ids}")
+
+            # Generate content
+            generated = await news_fetcher.generate_content_for_news(db, news_ids)
+            logger.info(f"GLM retry completed: {generated}/{len(news_ids)} succeeded")
+
+        except Exception as e:
+            logger.error(f"Error in GLM retry task: {str(e)}")
         finally:
             db.close()
 

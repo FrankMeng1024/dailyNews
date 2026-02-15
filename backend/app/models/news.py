@@ -11,8 +11,10 @@ class News(Base):
     source_name = Column(String(128), nullable=False)
     source_url = Column(String(1024))
     author = Column(String(256))
-    content = Column(Text, comment="Original article content")
-    summary = Column(Text, comment="GLM-generated summary")
+    content = Column(Text, comment="GLM-generated summary for display")
+    summary = Column(Text, comment="GLM-generated summary (deprecated, use content)")
+    original_content = Column(Text, comment="Original full article text")
+    content_status = Column(String(32), default="pending", comment="pending/generating/ready/failed")
     image_url = Column(String(1024))
     published_at = Column(DateTime, nullable=False, index=True)
     api_score = Column(DECIMAL(5, 4), default=None, comment="NewsAPI relevance score")
@@ -21,6 +23,11 @@ class News(Base):
     category = Column(String(64), default="ai", index=True, comment="News category")
     fetched_at = Column(DateTime, server_default=func.now(), index=True)
     created_at = Column(DateTime, server_default=func.now())
+
+    # GLM retry fields
+    glm_retry_count = Column(Integer, default=0, comment="GLM generation retry count")
+    glm_last_error = Column(String(512), comment="Last GLM error message")
+    glm_next_retry_at = Column(DateTime, comment="Next retry time for GLM generation")
 
     def calculate_final_score(self):
         """Calculate hybrid score: 30% API + 70% GLM"""

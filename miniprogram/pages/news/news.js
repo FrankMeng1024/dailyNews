@@ -12,6 +12,7 @@ Page({
     hasMore: true,
     selectedNews: null,
     showDetail: false,
+    activeTab: 'original',  // 'original' | 'summary' | 'link'
     theme: 'light',
     // Fetch progress state
     fetchTaskId: null,
@@ -100,13 +101,9 @@ Page({
   },
 
   async onManualFetch() {
-    if (this.data.refreshing || this.data.fetchTaskId) return;
+    if (this.data.fetchStatus) return;
 
-    this.setData({
-      refreshing: true,
-      fetchStatus: 'starting',
-      fetchProgress: 'Starting fetch...'
-    });
+    this.setData({ fetchStatus: '获取' });
 
     try {
       const res = await newsService.fetchNews(false);
@@ -115,15 +112,10 @@ Page({
         this.setData({ fetchTaskId: res.task_id });
         this.pollFetchStatus(res.task_id);
       } else {
-        wx.showToast({
-          title: res.message || 'Fetch started',
-          icon: 'none'
-        });
-        this.setData({ refreshing: false, fetchStatus: null, fetchProgress: '' });
+        this.setData({ fetchStatus: null, fetchTaskId: null });
       }
     } catch (err) {
-      wx.showToast({ title: err.message || 'Fetch failed', icon: 'none' });
-      this.setData({ refreshing: false, fetchStatus: null, fetchProgress: '' });
+      this.setData({ fetchStatus: null, fetchTaskId: null });
     }
   },
 
@@ -131,43 +123,37 @@ Page({
     try {
       const status = await newsService.getFetchStatus(taskId);
 
-      this.setData({
-        fetchStatus: status.status,
-        fetchProgress: status.progress || status.status
-      });
+      // Update status text based on progress
+      if (status.status === 'running') {
+        const progress = status.progress || '';
+        if (progress.includes('GLM') || progress.includes('Processing')) {
+          this.setData({ fetchStatus: '提炼' });
+        } else {
+          this.setData({ fetchStatus: '获取' });
+        }
+      }
 
       if (status.status === 'completed') {
-        const msg = `Fetched ${status.saved_count || 0} new, ${status.skipped_count || 0} skipped`;
-        wx.showToast({ title: msg, icon: 'success', duration: 2000 });
-
         this.setData({
-          refreshing: false,
-          fetchTaskId: null,
           fetchStatus: null,
-          fetchProgress: ''
+          fetchTaskId: null
         });
 
         if (status.saved_count > 0) {
           this.fetchNews(true);
         }
       } else if (status.status === 'failed') {
-        wx.showToast({ title: status.error || 'Fetch failed', icon: 'none' });
         this.setData({
-          refreshing: false,
-          fetchTaskId: null,
           fetchStatus: null,
-          fetchProgress: ''
+          fetchTaskId: null
         });
       } else {
         setTimeout(() => this.pollFetchStatus(taskId), 2000);
       }
     } catch (err) {
-      wx.showToast({ title: 'Status check failed', icon: 'none' });
       this.setData({
-        refreshing: false,
-        fetchTaskId: null,
         fetchStatus: null,
-        fetchProgress: ''
+        fetchTaskId: null
       });
     }
   },
@@ -179,7 +165,8 @@ Page({
     if (news) {
       this.setData({
         selectedNews: news,
-        showDetail: true
+        showDetail: true,
+        activeTab: 'original'  // Default to original content
       });
     }
   },
@@ -187,8 +174,55 @@ Page({
   onDetailClose() {
     this.setData({
       showDetail: false,
-      selectedNews: null
+      selectedNews: null,
+      activeTab: 'original'
     });
+  },
+
+  async onToggleContent(e) {
+    const type = e.currentTarget.dataset.type;
+    this.setData({ activeTab: type });
+
+    // When switching to summary tab, check if content needs refresh
+    if (type === 'summary' && this.data.selectedNews) {
+      const news = this.data.selectedNews;
+      // If no content yet, start polling for it
+      if (!news.content) {
+        this.pollRefineStatus(news.id);
+      }
+    }
+  },
+
+  async pollRefineStatus(newsId) {
+    if (this._refinePolling) return;
+    this._refinePolling = true;
+
+    try {
+      const status = await newsService.getRefineStatus(newsId);
+
+      if (status.status === 'completed' && status.content) {
+        // Update selectedNews with new content
+        const updatedNews = { ...this.data.selectedNews, content: status.content };
+        this.setData({ selectedNews: updatedNews });
+
+        // Also update in newsList
+        const newsList = this.data.newsList.map(n =>
+          n.id === newsId ? { ...n, content: status.content } : n
+        );
+        this.setData({ newsList });
+        this._refinePolling = false;
+      } else if (status.status === 'processing') {
+        // Still processing, poll again
+        setTimeout(() => {
+          this._refinePolling = false;
+          this.pollRefineStatus(newsId);
+        }, 2000);
+      } else {
+        this._refinePolling = false;
+      }
+    } catch (err) {
+      this._refinePolling = false;
+    }
   },
 
   onOpenSource() {

@@ -1,5 +1,5 @@
 // API base URL - change for production
-const BASE_URL = 'https://bell-aggregate-aid-safe.trycloudflare.com/api/v1';
+const BASE_URL = 'https://seem-toolkit-heater-universal.trycloudflare.com/api/v1';
 
 // Storage keys
 const STORAGE_KEYS = {

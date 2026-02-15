@@ -43,6 +43,8 @@ class NewsResponse(BaseModel):
     source_url: Optional[str] = None
     author: Optional[str] = None
     content: Optional[str] = None
+    original_content: Optional[str] = None  # Full article text
+    content_status: str = "pending"  # pending/generating/ready
     summary: Optional[str] = None
     image_url: Optional[str] = None
     published_at: datetime
@@ -55,14 +57,14 @@ class NewsResponse(BaseModel):
     def serialize_published_at(self, v: datetime) -> str:
         if v:
             beijing_dt = v + timedelta(hours=8)
-            return beijing_dt.strftime("%Y-%m-%d %H:%M:%S")
+            return beijing_dt.strftime("%Y年%m月%d日 %H:%M")
         return ""
 
     @field_serializer('created_at')
     def serialize_created_at(self, v: datetime) -> str:
         if v:
             beijing_dt = v + timedelta(hours=8)
-            return beijing_dt.strftime("%Y-%m-%d %H:%M:%S")
+            return beijing_dt.strftime("%Y年%m月%d日 %H:%M")
         return ""
 
     class Config:

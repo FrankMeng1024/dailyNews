@@ -1,12 +1,51 @@
 #!/usr/bin/env python3
 """
 Start server with Cloudflare Tunnel and QR code for mobile testing
+Auto-compiles WeChat miniprogram before starting
 """
 import subprocess
 import sys
 import time
 import re
 import os
+from pathlib import Path
+
+# WeChat Developer Tools CLI path
+WECHAT_CLI = "/Applications/wechatwebdevtools.app/Contents/MacOS/cli"
+# Miniprogram project path
+MINIPROGRAM_PATH = Path(__file__).parent.parent / "miniprogram"
+
+def compile_miniprogram():
+    """Compile WeChat miniprogram using CLI"""
+    if not os.path.exists(WECHAT_CLI):
+        print("  ⚠ WeChat DevTools not found, skipping compile")
+        return False
+
+    if not MINIPROGRAM_PATH.exists():
+        print(f"  ⚠ Miniprogram path not found: {MINIPROGRAM_PATH}")
+        return False
+
+    print(f"  Compiling: {MINIPROGRAM_PATH}")
+    try:
+        # Build the miniprogram
+        result = subprocess.run(
+            [WECHAT_CLI, "--build", "--project", str(MINIPROGRAM_PATH)],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        if result.returncode == 0:
+            print("  ✓ Miniprogram compiled successfully")
+            return True
+        else:
+            print(f"  ⚠ Compile warning: {result.stderr[:100] if result.stderr else 'unknown'}")
+            return True  # Continue anyway
+    except subprocess.TimeoutExpired:
+        print("  ⚠ Compile timeout, continuing...")
+        return True
+    except Exception as e:
+        print(f"  ⚠ Compile error: {e}")
+        return True  # Continue anyway
 
 def print_qr_terminal(url):
     """Print QR code in terminal using ASCII"""
@@ -61,6 +100,11 @@ def main():
     print("=" * 50)
     print("   AI News App - Starting Server")
     print("=" * 50)
+    print()
+
+    # Compile miniprogram first
+    print("Compiling WeChat miniprogram...")
+    compile_miniprogram()
     print()
 
     # Start uvicorn

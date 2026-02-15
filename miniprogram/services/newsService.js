@@ -47,10 +47,18 @@ const getFetchStatus = (taskId) => {
   return get(`/news/fetch/status/${taskId}`);
 };
 
+/**
+ * Get refine status for a news item
+ */
+const getRefineStatus = (newsId) => {
+  return get(`/news/${newsId}/refine-status`);
+};
+
 module.exports = {
   getNewsList,
   getTodayNews,
   getNewsDetail,
   fetchNews,
-  getFetchStatus
+  getFetchStatus,
+  getRefineStatus
 };

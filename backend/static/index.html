@@ -12,8 +12,10 @@
         .app { padding-bottom: 80px; }
         .header { position: sticky; top: 0; background: var(--card); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); z-index: 100; }
         .header h1 { font-size: 20px; font-weight: 700; }
-        .header-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(0,122,255,0.1); display: flex; align-items: center; justify-content: center; border: none; font-size: 18px; cursor: pointer; }
-        .header-btn.loading { animation: pulse 1s infinite; }
+        .header-btn { min-width: 50px; height: 32px; border-radius: 16px; background: rgba(0,122,255,0.1); display: flex; align-items: center; justify-content: center; border: none; font-size: 14px; cursor: pointer; color: var(--primary); font-weight: 500; padding: 0 12px; }
+        .header-btn.loading { animation: pulse 0.8s infinite; }
+        .header-btn.loading::after { content: ''; animation: dots 1.2s infinite; }
+        @keyframes dots { 0% { content: ''; } 33% { content: '.'; } 66% { content: '..'; } 100% { content: '...'; } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .tabs { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); display: flex; border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
         .tab { flex: 1; padding: 10px; text-align: center; color: var(--text2); font-size: 11px; cursor: pointer; }
@@ -48,6 +50,9 @@
         .detail-meta { display: flex; gap: 12px; color: var(--text2); font-size: 13px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
         .detail-text { font-size: 16px; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
         .detail-link { display: inline-block; margin-top: 20px; padding: 12px 20px; background: var(--primary); color: white; border-radius: 8px; text-decoration: none; font-weight: 500; }
+        .detail-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+        .detail-tab { flex: 1; padding: 12px; text-align: center; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; }
+        .detail-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
         
         .audio-card { background: var(--card); border-radius: 12px; padding: 14px; margin: 12px; display: flex; align-items: center; gap: 14px; }
         .audio-icon { width: 48px; height: 48px; border-radius: 50%; background: rgba(0,122,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
@@ -99,7 +104,7 @@
         <div id="news-page" class="page active">
             <div class="header">
                 <h1>AI News</h1>
-                <button id="refresh-btn" class="header-btn" onclick="fetchNews()">🔄</button>
+                <button id="refresh-btn" class="header-btn" onclick="fetchNews()">拉取</button>
             </div>
             <div id="news-list" class="news-list"></div>
         </div>
@@ -216,34 +221,23 @@
             renderNews();
         }
 
-        // Format time to Beijing timezone
-        function formatBeijingTime(dateStr) {
-            if (!dateStr) return '';
-            const date = new Date(dateStr);
-            const beijingDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
-            const now = new Date();
-            const nowBeijing = new Date(now.getTime() + (8 * 60 * 60 * 1000));
-            
-            const diffMs = nowBeijing - beijingDate;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMins / 60);
-            const diffDays = Math.floor(diffHours / 24);
-            
-            if (diffMins < 60) return diffMins + '分钟前';
-            if (diffHours < 24) return diffHours + '小时前';
-            if (diffDays < 7) return diffDays + '天前';
-            
-            const month = beijingDate.getUTCMonth() + 1;
-            const day = beijingDate.getUTCDate();
-            const hour = beijingDate.getUTCHours();
-            const min = String(beijingDate.getUTCMinutes()).padStart(2, '0');
-            return `${month}月${day}日 ${hour}:${min}`;
+        // Wake lock to prevent screen sleep during fetch
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (e) { console.log('Wake lock not supported'); }
+        }
+        function releaseWakeLock() {
+            if (wakeLock) { wakeLock.release(); wakeLock = null; }
         }
 
         function renderNews() {
             const list = document.getElementById('news-list');
             if (!currentNews.length) {
-                list.innerHTML = '<div class="empty"><div class="empty-icon">📰</div><div>No news yet</div><div style="margin-top:8px;font-size:13px">Tap 🔄 to fetch</div></div>';
+                list.innerHTML = '<div class="empty"><div class="empty-icon">📰</div><div>No news yet</div><div style="margin-top:8px;font-size:13px">Tap 拉取 to fetch</div></div>';
                 return;
             }
             list.innerHTML = currentNews.map((n, i) => `
@@ -251,7 +245,7 @@
                     <div class="news-title">${n.title}</div>
                     <div class="news-meta">
                         <span class="news-source">${n.source_name}</span>
-                        <span class="news-time">${formatBeijingTime(n.published_at)}</span>
+                        <span class="news-time">${n.published_at || ''}</span>
                         ${n.category === 'ai' ? '<span class="badge badge-ai">AI</span>' : ''}
                         ${(n.final_score || 0) > 0.8 ? '<span class="badge badge-hot">Hot</span>' : ''}
                     </div>
@@ -273,54 +267,90 @@
 
         async function fetchNews() {
             const btn = document.getElementById('refresh-btn');
+            btn.disabled = true;
             btn.classList.add('loading');
-            btn.textContent = '⏳';
-            
-            showProgress('正在连接新闻源...', 10);
-            
-            setTimeout(() => showProgress('获取 Hacker News...', 25), 500);
-            setTimeout(() => showProgress('获取 Reddit AI...', 40), 1500);
-            setTimeout(() => showProgress('获取 NewsAPI...', 55), 2500);
-            setTimeout(() => showProgress('GLM 智能分析中...', 70), 4000);
-            setTimeout(() => showProgress('去重和排序...', 85), 6000);
-            
+            await requestWakeLock();
+
             try {
                 const result = await api('/api/v1/news/fetch', { method: 'POST' });
-                showProgress('完成！获取了 ' + (result.fetched_count || 0) + ' 条新闻', 100);
+
+                if (result.task_id) {
+                    await pollFetchStatus(result.task_id, btn);
+                }
+
                 await loadNews();
-                setTimeout(hideProgress, 1500);
             } catch (e) {
-                showProgress('获取失败，请重试', 0);
-                setTimeout(hideProgress, 2000);
+                console.error(e);
             }
-            
+
+            releaseWakeLock();
             btn.classList.remove('loading');
-            btn.textContent = '🔄';
+            btn.disabled = false;
+            btn.textContent = '拉取';
+        }
+
+        async function pollFetchStatus(taskId, btn) {
+            for (let i = 0; i < 120; i++) {
+                try {
+                    const status = await api(`/api/v1/news/fetch/status/${taskId}`);
+
+                    // Update button text based on progress
+                    if (status.progress) {
+                        if (status.progress.includes('Fetching')) btn.textContent = '拉取中';
+                        else if (status.progress.includes('GLM') || status.progress.includes('Generating')) btn.textContent = '分析中';
+                        else if (status.progress.includes('Saving') || status.progress.includes('Saved')) btn.textContent = '保存中';
+                    }
+
+                    if (status.status === 'completed' || status.status === 'failed') {
+                        return;
+                    }
+
+                    await new Promise(r => setTimeout(r, 500));
+                } catch (e) {
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
         }
 
         function showDetail(i) {
             const n = currentNews[i];
+            window.currentDetailNews = n;
             document.getElementById('detail-header-title').textContent = n.source_name;
-            
-            // Get full content - prefer content, then summary
-            let content = n.content || n.summary || '';
-            // Clean up content - remove [+xxx chars] suffix
-            content = content.replace(/\[\+\d+ chars\]$/, '').trim();
-            if (!content) content = '暂无详细内容，请点击下方链接查看原文。';
-            
+
+            // Get content
+            let refined = n.content || '';
+            let original = n.original_content || n.summary || '';
+            refined = refined.replace(/\[\+\d+ chars\]$/, '').trim();
+            original = original.replace(/\[\+\d+ chars\]$/, '').trim();
+
+            // Store for tab switching
+            window.detailContent = { refined, original };
+
             document.getElementById('detail-body').innerHTML = `
                 <div class="detail-content">
                     <div class="detail-title">${n.title}</div>
                     <div class="detail-meta">
                         <span class="news-source">${n.source_name}</span>
-                        <span>${formatBeijingTime(n.published_at)}</span>
+                        <span>${n.published_at || ''}</span>
                         ${n.category === 'ai' ? '<span class="badge badge-ai">AI</span>' : ''}
                     </div>
-                    <div class="detail-text">${content}</div>
-                    ${n.source_url ? `<a class="detail-link" href="${n.source_url}" target="_blank">阅读原文 →</a>` : ''}
+                    <div class="detail-tabs">
+                        <div class="detail-tab active" onclick="switchTab('original')">原文</div>
+                        <div class="detail-tab" onclick="switchTab('refined')">精炼</div>
+                        ${n.source_url ? `<div class="detail-tab" onclick="window.open('${n.source_url}', '_blank')">阅读原文</div>` : ''}
+                    </div>
+                    <div id="detail-text" class="detail-text">${original || '暂无原文内容'}</div>
                 </div>
             `;
             document.getElementById('detail-page').classList.add('show');
+        }
+
+        function switchTab(type) {
+            const tabs = document.querySelectorAll('.detail-tab');
+            tabs[0].classList.toggle('active', type === 'original');
+            tabs[1].classList.toggle('active', type === 'refined');
+            const content = type === 'refined' ? window.detailContent.refined : window.detailContent.original;
+            document.getElementById('detail-text').textContent = content || (type === 'refined' ? '精炼生成中...' : '原文无法抓取');
         }
 
         function closeDetail() {
@@ -335,7 +365,7 @@
                     <div class="audio-icon">${a.status === 'completed' ? '▶' : '⏳'}</div>
                     <div class="audio-info">
                         <div class="audio-title">${a.title}</div>
-                        <div class="audio-meta">${formatDuration(a.duration)} · ${formatBeijingTime(a.created_at)}</div>
+                        <div class="audio-meta">${formatDuration(a.duration)} · ${a.created_at || ''}</div>
                     </div>
                 </div>
             `).join('') : '<div class="empty"><div class="empty-icon">🎧</div><div>No audio yet</div></div>';

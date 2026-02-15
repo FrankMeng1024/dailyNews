@@ -101,6 +101,28 @@ async def get_fetch_status(task_id: str):
     return task
 
 
+@router.get("/{news_id}/refine-status")
+async def get_refine_status(
+    news_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get the refine (GLM content generation) status of a news item.
+    Used by frontend to poll for content updates.
+    """
+    news = db.query(News).filter(News.id == news_id).first()
+
+    if not news:
+        raise HTTPException(status_code=404, detail="News not found")
+
+    return {
+        "id": news.id,
+        "status": news.content_status or "pending",
+        "content": news.content,
+        "has_content": bool(news.content and len(news.content) > 50)
+    }
+
+
 @router.get("/{news_id}", response_model=NewsResponse)
 async def get_news_detail(
     news_id: int,
@@ -121,11 +143,14 @@ async def get_news_detail(
 async def start_fetch_news(
     background_tasks: BackgroundTasks,
     force: bool = Query(False, description="Force fetch even if recently fetched"),
+    quick: bool = Query(False, description="Quick mode: skip GLM content generation"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Start a background fetch task. Returns task_id for polling status.
+    quick=True (default): Fast fetch without AI summaries
+    quick=False: Full fetch with GLM content generation (slower)
     """
     # Check last fetch time (prevent abuse)
     if not force:
@@ -152,7 +177,8 @@ async def start_fetch_news(
         do_fetch_news_background,
         task_id=task_id,
         user_id=current_user.id,
-        language=language
+        language=language,
+        skip_glm=quick
     )
 
     return {
@@ -162,44 +188,77 @@ async def start_fetch_news(
     }
 
 
-async def do_fetch_news_background(task_id: str, user_id: int, language: str):
+async def do_fetch_news_background(task_id: str, user_id: int, language: str, skip_glm: bool = True):
     """
-    Background task to fetch news with GLM content generation
+    Background task to fetch news and optionally generate GLM content
     """
     db = SessionLocal()
     try:
-        update_task(task_id, status="running", progress=10, message="Fetching from sources...")
+        # Step 1: Connect to sources
+        update_task(task_id, status="running", progress=5, message="连接新闻源...")
 
-        # Fetch news with full GLM processing (skip_glm=False)
-        update_task(task_id, progress=30, message="Processing with GLM...")
+        # Step 2: Fetch from multiple sources
+        update_task(task_id, progress=15, message="获取 Hacker News...")
+        await asyncio.sleep(0.1)
+
+        update_task(task_id, progress=25, message="获取 Reddit AI 版块...")
+        await asyncio.sleep(0.1)
+
+        update_task(task_id, progress=35, message="获取 NewsAPI...")
+
+        # Actually fetch news (always fast, GLM is async)
+        update_task(task_id, progress=45, message="抓取新闻中...")
 
         result = await news_fetcher.fetch_and_save_news(
             db,
             page_size=50,
             language=language,
-            skip_glm=False  # Full fetch with GLM content generation
+            skip_glm=True  # Always skip GLM in fetch, do it async
         )
 
-        # Handle tuple return (new_count, skipped_count) or int
-        if isinstance(result, tuple):
+        update_task(task_id, progress=70, message="去重与整理...")
+
+        # Handle tuple return (new_count, skipped_count, saved_ids, no_content_count)
+        if isinstance(result, tuple) and len(result) == 4:
+            new_count, skipped_count, saved_ids, no_content_count = result
+        elif isinstance(result, tuple) and len(result) == 3:
+            new_count, skipped_count, saved_ids = result
+            no_content_count = 0
+        elif isinstance(result, tuple):
             new_count, skipped_count = result
+            saved_ids = []
+            no_content_count = 0
         else:
             new_count = result
             skipped_count = 0
+            saved_ids = []
+            no_content_count = 0
 
-        update_task(task_id, progress=80, message="Scoring articles...")
+        # Step 3: Start async GLM content generation if not quick mode
+        if not skip_glm and saved_ids:
+            update_task(task_id, progress=75, message=f"后台生成摘要 ({len(saved_ids)} 条)...")
+            # Start GLM generation in background (non-blocking)
+            asyncio.create_task(
+                generate_content_background(saved_ids, language)
+            )
 
-        # Score new news with GLM
-        if new_count > 0:
-            unscored_news = db.query(News).filter(News.glm_score == None).all()
-            if unscored_news:
-                await glm_service.score_and_update_news(db, unscored_news)
+        # Step 4: Complete
+        update_task(task_id, progress=95, message="保存数据...")
+        await asyncio.sleep(0.2)
+
+        msg = f"完成！新增 {new_count} 条"
+        if skipped_count > 0:
+            msg += f"，跳过 {skipped_count} 条重复"
+        if no_content_count > 0:
+            msg += f"，{no_content_count} 条无法抓取原文"
+        if not skip_glm and saved_ids:
+            msg += f"，摘要后台生成中"
 
         update_task(
             task_id,
             status="completed",
             progress=100,
-            message=f"Added {new_count} new, skipped {skipped_count} duplicates",
+            message=msg,
             result={
                 "fetched_count": new_count,
                 "skipped_count": skipped_count
@@ -211,7 +270,18 @@ async def do_fetch_news_background(task_id: str, user_id: int, language: str):
             task_id,
             status="failed",
             progress=0,
-            message=str(e)
+            message=f"出错: {str(e)[:50]}"
         )
+    finally:
+        db.close()
+
+
+async def generate_content_background(news_ids: list, language: str):
+    """Background task to generate GLM content for news items"""
+    db = SessionLocal()
+    try:
+        await news_fetcher.generate_content_for_news(db, news_ids, language)
+    except Exception as e:
+        print(f"Background GLM generation error: {e}")
     finally:
         db.close()
