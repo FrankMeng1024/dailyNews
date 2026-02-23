@@ -1,11 +1,35 @@
 import asyncio
-from typing import List, Optional
+import logging
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from app.models.news import News
 from app.models.audio import AudioRecording, AudioNews
 from app.services.glm_service import glm_service
 from app.services.tts_service import tts_service
+
+logger = logging.getLogger(__name__)
+
+# In-memory progress tracking
+_audio_progress: Dict[int, Dict[str, Any]] = {}
+
+
+def get_audio_progress(audio_id: int) -> Optional[Dict[str, Any]]:
+    """Get progress for an audio generation task"""
+    return _audio_progress.get(audio_id)
+
+
+def set_audio_progress(audio_id: int, progress: int, stage: str):
+    """Set progress for an audio generation task"""
+    _audio_progress[audio_id] = {
+        "progress": progress,
+        "stage": stage
+    }
+
+
+def clear_audio_progress(audio_id: int):
+    """Clear progress after completion"""
+    _audio_progress.pop(audio_id, None)
 
 
 class AudioService:
@@ -16,6 +40,7 @@ class AudioService:
         db: Session,
         user_id: int,
         news_ids: List[int],
+        title: Optional[str] = None,
         language: str = "zh"
     ) -> AudioRecording:
         """
@@ -25,6 +50,7 @@ class AudioService:
             db: Database session
             user_id: User ID
             news_ids: List of news IDs to include
+            title: Optional custom title from user
             language: Audio language (zh, en, bilingual)
 
         Returns:
@@ -36,15 +62,19 @@ class AudioService:
         if not news_list:
             raise ValueError("No valid news articles found")
 
-        # Generate title from first news
-        title = f"AI News Discussion - {news_list[0].title[:50]}..."
-        if len(news_list) > 1:
-            title = f"AI News Discussion ({len(news_list)} articles)"
+        # Use custom title if provided, otherwise generate default
+        if title and title.strip():
+            audio_title = title.strip()[:100]  # Limit to 100 chars
+        else:
+            # Generate default title from first news
+            audio_title = f"AI News - {news_list[0].title[:50]}..."
+            if len(news_list) > 1:
+                audio_title = f"AI News ({len(news_list)} articles)"
 
         # Create audio record
         audio = AudioRecording(
             user_id=user_id,
-            title=title,
+            title=audio_title,
             file_path="",
             language=language,
             status="pending"
@@ -76,7 +106,7 @@ class AudioService:
         language: str
     ):
         """
-        Background task to generate audio
+        Background task to generate audio with progress tracking
 
         Args:
             db: Database session
@@ -98,29 +128,54 @@ class AudioService:
             audio.status = "processing"
             db.commit()
 
+            # Progress: 0-30% for dialogue generation
+            set_audio_progress(audio_id, 5, "Preparing news content")
+            logger.info(f"Audio {audio_id}: Starting dialogue generation")
+
             # Generate dialogue script
+            set_audio_progress(audio_id, 10, "Generating dialogue script")
             dialogue = await glm_service.generate_dialogue_script(news_list, language)
+            set_audio_progress(audio_id, 30, "Dialogue script ready")
+            logger.info(f"Audio {audio_id}: Dialogue generated with {len(dialogue)} turns")
+
+            # Progress callback for TTS (30-90%)
+            def tts_progress_callback(progress: int, stage: str):
+                set_audio_progress(audio_id, progress, stage)
+                logger.info(f"Audio {audio_id}: {stage} ({progress}%)")
 
             # Generate audio from dialogue
-            result = await tts_service.generate_dialogue_audio(dialogue)
+            result = await tts_service.generate_dialogue_audio(
+                dialogue,
+                language=language,
+                progress_callback=tts_progress_callback
+            )
 
             # Update audio record
+            set_audio_progress(audio_id, 95, "Saving audio file")
             audio.file_path = result["file_path"]
             audio.file_size = result["file_size"]
             audio.duration = result["duration"]
             audio.status = "completed"
             db.commit()
 
+            set_audio_progress(audio_id, 100, "Complete")
+            logger.info(f"Audio {audio_id}: Generation complete - {result['duration']}s, {result['file_size']} bytes")
+
         except Exception as e:
+            logger.error(f"Audio {audio_id}: Generation failed - {e}")
             # Update status to failed
             audio = db.query(AudioRecording).filter(AudioRecording.id == audio_id).first()
             if audio:
                 audio.status = "failed"
                 audio.error_message = str(e)
                 db.commit()
+            set_audio_progress(audio_id, 0, f"Failed: {str(e)[:50]}")
 
         finally:
             db.close()
+            # Clear progress after a delay to allow final status check
+            await asyncio.sleep(5)
+            clear_audio_progress(audio_id)
 
     def get_audio_with_news(self, db: Session, audio_id: int) -> Optional[dict]:
         """

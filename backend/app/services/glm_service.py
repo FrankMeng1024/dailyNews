@@ -22,19 +22,20 @@ class GLMService:
             "Content-Type": "application/json"
         }
 
-    async def _call_api(self, messages: List[Dict[str, str]], max_tokens: int = 1024) -> str:
+    async def _call_api(self, messages: List[Dict[str, str]], max_tokens: int = 1024, model: str = None) -> str:
         """
         Call GLM API with messages
 
         Args:
             messages: List of message dicts with role and content
             max_tokens: Maximum tokens in response
+            model: Model to use (defaults to glm-4.7-flash - free model)
 
         Returns:
             Response content string
         """
         payload = {
-            "model": self.model,
+            "model": model or "glm-4.7-flash",  # Use latest free model
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": 0.7
@@ -151,10 +152,19 @@ Summary:"""
         Returns:
             List of dialogue turns with speaker and text
         """
-        # Prepare news content
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Prepare news content - use refined content (news.content) with higher limit
         news_content = []
         for i, news in enumerate(news_list):
-            news_content.append(f"Article {i+1}: {news.title}\n{news.summary or news.content[:500]}")
+            # Prefer refined content, fallback to original_content, then summary
+            content = news.content or news.original_content or news.summary or ""
+            # Use up to 2000 chars per article for better dialogue quality
+            content_preview = content[:2000] if content else ""
+            news_content.append(f"新闻 {i+1}: {news.title}\n{content_preview}")
+            # Debug logging
+            logger.info(f"[Dialogue] News {i+1}: title={news.title[:50]}, content_status={news.content_status}, content_len={len(content)}")
 
         lang_instruction = {
             "zh": "用中文生成对话",
@@ -162,27 +172,32 @@ Summary:"""
             "bilingual": "Generate dialogue mixing Chinese and English naturally"
         }.get(language, "用中文生成对话")
 
-        prompt = f"""Create a natural discussion between two hosts about these AI news articles.
-Host A (Alice/小雅) is female, analytical and asks insightful questions.
-Host B (Bob/小明) is male, provides explanations and shares opinions.
+        prompt = f"""你是一位专业的播客脚本作家。请根据以下新闻内容，创作一段两人对话讨论。
+
+主持人设定：
+- 小雅（女）：善于分析，提出有洞察力的问题
+- 小明（男）：善于解释，分享观点和见解
 
 {lang_instruction}
 
-News to discuss:
+新闻内容：
 {chr(10).join(news_content)}
 
-Create an engaging 3-5 minute dialogue that:
-1. Opens with a brief introduction
-2. Discusses each news item with analysis
-3. Includes back-and-forth discussion
-4. Ends with a summary/conclusion
+要求：
+1. 开场简短介绍今天要讨论的话题
+2. 深入讨论每条新闻的核心内容、技术细节、行业影响
+3. 两人有来有往，自然对话，不要生硬
+4. 结尾总结要点，展望未来
+5. 对话时长约3-5分钟（约800-1200字）
 
-Format as JSON array:
+输出格式（JSON数组）：
 [
-  {{"speaker": "Alice", "text": "..."}},
-  {{"speaker": "Bob", "text": "..."}},
+  {{"speaker": "小雅", "text": "..."}},
+  {{"speaker": "小明", "text": "..."}},
   ...
-]"""
+]
+
+只输出JSON，不要其他内容。"""
 
         messages = [
             {"role": "system", "content": "You are a podcast script writer. Output valid JSON only."},
@@ -190,7 +205,20 @@ Format as JSON array:
         ]
 
         try:
-            response = await self._call_api(messages, max_tokens=4096)
+            # Retry logic for rate limiting
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = await self._call_api(messages, max_tokens=4096)
+                    break
+                except Exception as e:
+                    if '429' in str(e) and attempt < max_retries - 1:
+                        logger.warning(f"[Dialogue] Rate limited, waiting 5s before retry {attempt + 2}/{max_retries}")
+                        import asyncio
+                        await asyncio.sleep(5)
+                    else:
+                        raise e
+
             # Clean response and parse JSON
             response = response.strip()
             if response.startswith("```"):
@@ -198,13 +226,16 @@ Format as JSON array:
                 if response.startswith("json"):
                     response = response[4:]
 
-            return json.loads(response)
+            dialogue = json.loads(response)
+            logger.info(f"[Dialogue] Generated {len(dialogue)} turns")
+            return dialogue
 
         except Exception as e:
+            logger.error(f"[Dialogue] GLM error: {e}")
             # Return minimal dialogue on error
             return [
-                {"speaker": "Alice", "text": "今天我们来讨论一些AI新闻。" if language == "zh" else "Let's discuss some AI news today."},
-                {"speaker": "Bob", "text": "好的，让我们开始吧。" if language == "zh" else "Sure, let's get started."}
+                {"speaker": "小雅", "text": "今天我们来讨论一些AI新闻。" if language == "zh" else "Let's discuss some AI news today."},
+                {"speaker": "小明", "text": "好的，让我们开始吧。" if language == "zh" else "Sure, let's get started."}
             ]
 
     async def score_and_update_news(self, db: Session, news_list: List[News]) -> int:

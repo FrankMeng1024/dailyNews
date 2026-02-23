@@ -19,6 +19,7 @@ class AudioStatus(str, Enum):
 
 class AudioCreate(BaseModel):
     news_ids: List[int]
+    title: Optional[str] = None  # User custom title, optional
     language: AudioLanguage = AudioLanguage.zh
 
 
@@ -31,6 +32,7 @@ class AudioResponse(BaseModel):
     language: str
     status: str
     error_message: Optional[str] = None
+    is_favorite: bool = False
     created_at: datetime
 
     class Config:

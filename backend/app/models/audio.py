@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Enum, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Text, Enum, DateTime, ForeignKey, Boolean, func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -15,6 +15,7 @@ class AudioRecording(Base):
     language = Column(Enum("zh", "en", "bilingual"), nullable=False, default="zh")
     status = Column(Enum("pending", "processing", "completed", "failed"), default="pending", index=True)
     error_message = Column(Text, default=None)
+    is_favorite = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime, server_default=func.now(), index=True)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

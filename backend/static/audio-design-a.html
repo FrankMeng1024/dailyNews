@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Design A: Apple Music Style</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #fafafa;
+            --card: #ffffff;
+            --text: #1d1d1f;
+            --text2: #86868b;
+            --accent: #fa2d48;
+            --accent-light: rgba(250, 45, 72, 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding-bottom: 140px;
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            background: rgba(250, 250, 250, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 16px 20px;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: var(--text2);
+            margin-top: 4px;
+        }
+
+        .audio-grid {
+            padding: 16px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .audio-card {
+            background: var(--card);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .audio-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+
+        .audio-cover {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .audio-cover::before {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+        }
+
+        .audio-cover-icon {
+            font-size: 28px;
+            color: white;
+            z-index: 1;
+        }
+
+        .audio-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .audio-title {
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .audio-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            font-size: 13px;
+            color: var(--text2);
+        }
+
+        .audio-duration {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .audio-date {
+            color: var(--text2);
+        }
+
+        .play-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            flex-shrink: 0;
+            align-self: center;
+            box-shadow: 0 4px 12px rgba(250, 45, 72, 0.3);
+            transition: transform 0.15s ease;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.08);
+        }
+
+        /* Now Playing Bar */
+        .now-playing {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(0,0,0,0.06);
+            padding: 12px 16px 28px;
+        }
+
+        .now-playing-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .now-playing-cover {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+        }
+
+        .now-playing-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .now-playing-title {
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .now-playing-artist {
+            font-size: 12px;
+            color: var(--text2);
+        }
+
+        .now-playing-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .control-btn {
+            font-size: 24px;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .control-btn.main {
+            width: 40px;
+            height: 40px;
+            background: var(--text);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 35%;
+            background: var(--accent);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .empty-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .empty-desc {
+            font-size: 14px;
+            color: var(--text2);
+        }
+
+        .fab {
+            position: fixed;
+            right: 20px;
+            bottom: 140px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 6px 20px rgba(250, 45, 72, 0.4);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .fab:hover {
+            transform: scale(1.1);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            background: var(--accent-light);
+            color: var(--accent);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Audio</h1>
+        <p>3 episodes · 45 min total</p>
+    </div>
+
+    <div class="audio-grid">
+        <div class="audio-card">
+            <div class="audio-cover" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <span class="audio-cover-icon">🎙</span>
+            </div>
+            <div class="audio-info">
+                <div class="audio-title">AI Weekly: OpenAI 发布 GPT-5，性能提升显著</div>
+                <div class="audio-meta">
+                    <span class="audio-duration">⏱ 12:34</span>
+                    <span class="audio-date">今天 14:30</span>
+                </div>
+            </div>
+            <div class="play-btn">▶</div>
+        </div>
+
+        <div class="audio-card">
+            <div class="audio-cover" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <span class="audio-cover-icon">🎙</span>
+            </div>
+            <div class="audio-info">
+                <div class="audio-title">科技前沿: Apple Vision Pro 2 即将发布</div>
+                <div class="audio-meta">
+                    <span class="audio-duration">⏱ 18:22</span>
+                    <span class="audio-date">昨天 09:15</span>
+                    <span class="badge">NEW</span>
+                </div>
+            </div>
+            <div class="play-btn">▶</div>
+        </div>
+
+        <div class="audio-card">
+            <div class="audio-cover" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <span class="audio-cover-icon">🎙</span>
+            </div>
+            <div class="audio-info">
+                <div class="audio-title">深度解读: 自动驾驶技术最新进展与挑战</div>
+                <div class="audio-meta">
+                    <span class="audio-duration">⏱ 15:08</span>
+                    <span class="audio-date">2天前</span>
+                </div>
+            </div>
+            <div class="play-btn">▶</div>
+        </div>
+    </div>
+
+    <div class="fab">+</div>
+
+    <div class="now-playing">
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+        <div class="now-playing-content">
+            <div class="now-playing-cover">🎙</div>
+            <div class="now-playing-info">
+                <div class="now-playing-title">AI Weekly: OpenAI 发布 GPT-5</div>
+                <div class="now-playing-artist">4:23 / 12:34</div>
+            </div>
+            <div class="now-playing-controls">
+                <span class="control-btn">⏮</span>
+                <span class="control-btn main">⏸</span>
+                <span class="control-btn">⏭</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
