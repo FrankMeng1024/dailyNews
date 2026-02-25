@@ -9,6 +9,7 @@ import re
 
 from app.config import settings
 from app.models.news import News
+from app.services.glm_service import glm_service
 
 
 class NewsFetcher:
@@ -488,7 +489,38 @@ Return only JSON."""
 
         db.commit()
         print(f"Saved {saved_count} new articles, skipped {skipped_count} duplicates, {no_content_count} without content")
+
+        # Translate titles for saved news
+        if saved_ids:
+            await self._translate_titles_for_news(db, saved_ids)
+
         return (saved_count, skipped_count, saved_ids, no_content_count)
+
+    async def _translate_titles_for_news(self, db: Session, news_ids: List[int]) -> int:
+        """Translate English titles to Chinese for saved news"""
+        news_list = db.query(News).filter(News.id.in_(news_ids)).all()
+        if not news_list:
+            return 0
+
+        # Get titles to translate
+        titles = [n.title for n in news_list]
+        print(f"Translating {len(titles)} titles...")
+
+        try:
+            # Batch translate
+            translated = await glm_service.translate_titles_batch(titles)
+
+            # Update news records
+            for i, news in enumerate(news_list):
+                if i < len(translated):
+                    news.title_zh = translated[i]
+
+            db.commit()
+            print(f"Translated {len(translated)} titles")
+            return len(translated)
+        except Exception as e:
+            print(f"Title translation error: {e}")
+            return 0
 
     # Retry intervals in minutes: 1, 3, 6, 9, 12
     RETRY_INTERVALS = [1, 3, 6, 9, 12]

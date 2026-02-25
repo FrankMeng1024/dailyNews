@@ -8,6 +8,7 @@ class News(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     external_id = Column(String(128), unique=True, comment="NewsAPI article ID or URL hash")
     title = Column(String(512), nullable=False)
+    title_zh = Column(String(512), comment="Chinese translated title")
     source_name = Column(String(128), nullable=False)
     source_url = Column(String(1024))
     author = Column(String(256))

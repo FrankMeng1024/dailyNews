@@ -32,6 +32,35 @@ def clear_audio_progress(audio_id: int):
     _audio_progress.pop(audio_id, None)
 
 
+def get_user_friendly_error(error_msg: str) -> str:
+    """将技术错误转换为用户友好的错误信息"""
+    if not error_msg:
+        return "生成失败，请稍后重试"
+
+    error_lower = error_msg.lower()
+
+    if 'connectionerror' in error_lower or 'timeout' in error_lower or 'connection' in error_lower:
+        return "网络连接失败，请检查网络后重试"
+    if '429' in error_msg or 'rate limit' in error_lower:
+        return "AI服务暂时繁忙，请稍后再试"
+    if '对话脚本太短' in error_msg:
+        return "生成的对话内容过短，请尝试选择更多新闻"
+    if '音频时长太短' in error_msg:
+        return "生成的音频过短，请选择内容更丰富的新闻"
+    if '语音合成失败' in error_msg:
+        return "语音合成服务暂时不可用，请稍后重试"
+    if 'glm' in error_lower or 'api' in error_lower:
+        return "AI服务暂时不可用，请稍后重试"
+    if '解析失败' in error_msg or 'json' in error_lower:
+        return "AI返回格式错误，请重试"
+
+    # 如果已经是用户友好的消息，直接返回
+    if any(x in error_msg for x in ['请', '失败', '错误', '不可用']):
+        return error_msg
+
+    return "生成失败，请稍后重试"
+
+
 class AudioService:
     """Service for audio generation orchestration"""
 
@@ -67,9 +96,9 @@ class AudioService:
             audio_title = title.strip()[:100]  # Limit to 100 chars
         else:
             # Generate default title from first news
-            audio_title = f"AI News - {news_list[0].title[:50]}..."
+            audio_title = f"AI资讯 - {news_list[0].title[:50]}..."
             if len(news_list) > 1:
-                audio_title = f"AI News ({len(news_list)} articles)"
+                audio_title = f"AI资讯 ({len(news_list)} 篇)"
 
         # Create audio record
         audio = AudioRecording(
@@ -129,13 +158,18 @@ class AudioService:
             db.commit()
 
             # Progress: 0-30% for dialogue generation
-            set_audio_progress(audio_id, 5, "Preparing news content")
+            set_audio_progress(audio_id, 5, "准备新闻内容")
             logger.info(f"Audio {audio_id}: Starting dialogue generation")
 
             # Generate dialogue script
-            set_audio_progress(audio_id, 10, "Generating dialogue script")
+            set_audio_progress(audio_id, 10, "生成对话脚本")
             dialogue = await glm_service.generate_dialogue_script(news_list, language)
-            set_audio_progress(audio_id, 30, "Dialogue script ready")
+
+            # Validate dialogue has enough turns
+            if len(dialogue) < 5:
+                raise Exception(f"对话脚本太短，只有{len(dialogue)}轮，需要至少5轮")
+
+            set_audio_progress(audio_id, 30, "对话脚本完成")
             logger.info(f"Audio {audio_id}: Dialogue generated with {len(dialogue)} turns")
 
             # Progress callback for TTS (30-90%)
@@ -150,26 +184,30 @@ class AudioService:
                 progress_callback=tts_progress_callback
             )
 
+            # Validate audio duration
+            if result["duration"] < 30:
+                raise Exception(f"音频时长太短，只有{result['duration']}秒，需要至少30秒")
+
             # Update audio record
-            set_audio_progress(audio_id, 95, "Saving audio file")
+            set_audio_progress(audio_id, 95, "保存音频文件")
             audio.file_path = result["file_path"]
             audio.file_size = result["file_size"]
             audio.duration = result["duration"]
             audio.status = "completed"
             db.commit()
 
-            set_audio_progress(audio_id, 100, "Complete")
+            set_audio_progress(audio_id, 100, "完成")
             logger.info(f"Audio {audio_id}: Generation complete - {result['duration']}s, {result['file_size']} bytes")
 
         except Exception as e:
             logger.error(f"Audio {audio_id}: Generation failed - {e}")
-            # Update status to failed
+            # Update status to failed with user-friendly error message
             audio = db.query(AudioRecording).filter(AudioRecording.id == audio_id).first()
             if audio:
                 audio.status = "failed"
-                audio.error_message = str(e)
+                audio.error_message = get_user_friendly_error(str(e))
                 db.commit()
-            set_audio_progress(audio_id, 0, f"Failed: {str(e)[:50]}")
+            set_audio_progress(audio_id, 0, f"失败: {get_user_friendly_error(str(e))[:30]}")
 
         finally:
             db.close()

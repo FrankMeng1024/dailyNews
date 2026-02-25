@@ -43,7 +43,7 @@ class TTSService:
         voice: str = "female",
         speed: float = 1.0,
         language: str = "zh",
-        max_retries: int = 3
+        max_retries: int = 5
     ) -> bytes:
         """
         Convert text to speech using Edge TTS with retry logic
@@ -90,10 +90,12 @@ class TTSService:
                 last_error = e
                 logger.warning(f"TTS attempt {attempt + 1}/{max_retries} failed - voice: {voice_id}, rate: {rate}, text_len: {len(text)}, error: {e}")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(1.5)  # Wait before retry
+                    wait_time = 2 * (attempt + 1)  # Exponential backoff: 2, 4, 6, 8 seconds
+                    logger.info(f"TTS waiting {wait_time}s before retry...")
+                    await asyncio.sleep(wait_time)
 
         logger.error(f"TTS failed after {max_retries} attempts - voice: {voice_id}, rate: {rate}, text: {text[:200]}..., error: {last_error}")
-        raise last_error
+        raise Exception(f"语音合成失败，已重试{max_retries}次: {last_error}")
 
     async def generate_dialogue_audio(
         self,

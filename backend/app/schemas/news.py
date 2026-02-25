@@ -39,6 +39,7 @@ class NewsCreate(NewsBase):
 class NewsResponse(BaseModel):
     id: int
     title: str
+    title_zh: Optional[str] = None  # Chinese translated title
     source_name: str
     source_url: Optional[str] = None
     author: Optional[str] = None
@@ -57,14 +58,14 @@ class NewsResponse(BaseModel):
     def serialize_published_at(self, v: datetime) -> str:
         if v:
             beijing_dt = v + timedelta(hours=8)
-            return beijing_dt.strftime("%Y年%m月%d日 %H:%M")
+            return beijing_dt.isoformat()
         return ""
 
     @field_serializer('created_at')
     def serialize_created_at(self, v: datetime) -> str:
         if v:
             beijing_dt = v + timedelta(hours=8)
-            return beijing_dt.strftime("%Y年%m月%d日 %H:%M")
+            return beijing_dt.isoformat()
         return ""
 
     class Config:

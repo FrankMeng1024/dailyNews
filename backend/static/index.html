@@ -3,155 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI News</title>
+    <title>AI 资讯</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root { --bg: #f5f5f7; --card: #fff; --text: #1d1d1f; --text2: #86868b; --primary: #007aff; --border: #e5e5ea; }
-        .dark { --bg: #000; --card: #1c1c1e; --text: #fff; --text2: #98989d; --primary: #0a84ff; --border: #38383a; }
+        :root {
+            --bg: #f5f5f7;
+            --card: #fff;
+            --card-gradient: linear-gradient(145deg, #ffffff, #f8f8fa);
+            --text: #1d1d1f;
+            --text2: #86868b;
+            --primary: #667eea;
+            --primary-end: #764ba2;
+            --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
+            --border: #e5e5ea;
+        }
+        .dark {
+            --bg: #0d0d0d;
+            --card: #1c1c2e;
+            --card-gradient: linear-gradient(145deg, #1c1c2e, #16162a);
+            --text: #fff;
+            --text2: #98989d;
+            --primary: #667eea;
+            --primary-end: #764ba2;
+            --border: #2a2a3e;
+        }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
         .app { padding-bottom: 80px; }
-        .header { position: sticky; top: 0; background: var(--card); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); z-index: 100; }
-        .header h1 { font-size: 20px; font-weight: 700; }
-        .header-btn { min-width: 50px; height: 32px; border-radius: 16px; background: rgba(0,122,255,0.1); display: flex; align-items: center; justify-content: center; border: none; font-size: 14px; cursor: pointer; color: var(--primary); font-weight: 500; padding: 0 12px; }
+        .header { position: sticky; top: 0; background: var(--card); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); z-index: 100; }
+        .dark .header { background: linear-gradient(180deg, #1c1c2e 0%, #0d0d0d 100%); }
+        .header h1 { font-size: 22px; font-weight: 700; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .header-btn { min-width: 56px; height: 34px; border-radius: 17px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: none; font-size: 14px; cursor: pointer; color: #fff; font-weight: 500; padding: 0 14px; box-shadow: 0 2px 8px rgba(102,126,234,0.3); transition: transform 0.2s, box-shadow 0.2s; }
+        .header-btn:hover { transform: scale(1.02); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+        .header-btn:active { transform: scale(0.98); }
         .header-btn.loading { animation: pulse 0.8s infinite; }
         .header-btn.loading::after { content: ''; animation: dots 1.2s infinite; }
         @keyframes dots { 0% { content: ''; } 33% { content: '.'; } 66% { content: '..'; } 100% { content: '...'; } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
         .tabs { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); display: flex; border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
-        .tab { flex: 1; padding: 10px; text-align: center; color: var(--text2); font-size: 11px; cursor: pointer; }
+        .dark .tabs { background: linear-gradient(180deg, #1c1c2e, #0d0d0d); }
+        .tab { flex: 1; padding: 10px; text-align: center; color: var(--text2); font-size: 11px; cursor: pointer; transition: color 0.2s; }
         .tab.active { color: var(--primary); }
         .tab-icon { font-size: 22px; margin-bottom: 2px; }
+        .tab-icon i { width: 22px; height: 22px; }
         .page { display: none; }
         .page.active { display: block; }
-        
+
         /* Progress bar */
-        .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--primary); z-index: 999; transition: width 0.3s; }
-        .progress-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); padding: 20px 28px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.2); z-index: 998; display: none; min-width: 260px; }
+        .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--primary-gradient); z-index: 999; transition: width 0.3s; }
+        .progress-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); padding: 24px 32px; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); z-index: 998; display: none; min-width: 280px; border: 1px solid var(--border); }
+        .dark .progress-text { background: var(--card-gradient); }
         .progress-text.show { display: block; }
         .progress-inner { height: 6px; background: var(--border); border-radius: 3px; margin-top: 12px; overflow: hidden; }
-        .progress-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.3s; }
+        .progress-fill { height: 100%; background: var(--primary-gradient); border-radius: 3px; transition: width 0.3s; }
         .progress-percent { font-size: 12px; color: var(--text2); margin-top: 8px; text-align: right; }
-        
+
         .news-list { padding: 12px; }
-        .news-card { background: var(--card); border-radius: 12px; margin-bottom: 12px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 14px; }
-        .news-title { font-size: 15px; font-weight: 600; line-height: 1.4; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .news-card { background: var(--card); border-radius: 20px; margin-bottom: 12px; overflow: hidden; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 16px 18px; transition: transform 0.2s, box-shadow 0.2s; border: 1px solid rgba(255,255,255,0.05); }
+        .dark .news-card { background: var(--card-gradient); border: 1px solid rgba(255,255,255,0.05); }
+        .news-card:hover { box-shadow: 0 4px 20px rgba(102,126,234,0.15); border-color: rgba(102,126,234,0.2); }
+        .news-card:active { transform: scale(0.98); }
+        .news-title { font-size: 15px; font-weight: 600; line-height: 1.5; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .news-meta { display: flex; gap: 8px; color: var(--text2); font-size: 12px; align-items: center; flex-wrap: wrap; }
         .news-source { color: var(--primary); font-weight: 500; }
         .news-time { color: var(--text2); }
-        .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; }
         .badge-ai { background: rgba(102,126,234,0.15); color: #667eea; }
-        .badge-hot { background: rgba(255,59,48,0.1); color: #ff3b30; }
+        .badge-hot { background: rgba(239,68,68,0.12); color: #ef4444; }
         
         /* Full screen detail page */
-        .detail-page { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 200; display: none; overflow-y: auto; }
+        .detail-page { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 200; display: none; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
         .detail-page.show { display: block; }
-        .detail-header { position: sticky; top: 0; background: var(--card); padding: 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); z-index: 10; }
-        .back-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(0,122,255,0.1); display: flex; align-items: center; justify-content: center; border: none; font-size: 20px; cursor: pointer; color: var(--primary); }
-        .detail-header-title { flex: 1; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .detail-content { padding: 16px; }
+        .detail-header { position: sticky; top: 0; background: var(--card); padding: 14px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); z-index: 10; }
+        .dark .detail-header { background: linear-gradient(180deg, #1c1c2e 0%, #0d0d0d 100%); }
+        .back-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(102,126,234,0.15); display: flex; align-items: center; justify-content: center; border: none; font-size: 20px; cursor: pointer; color: var(--primary); transition: transform 0.2s, background 0.2s; }
+        .back-btn:hover { background: rgba(102,126,234,0.25); }
+        .back-btn:active { transform: scale(0.95); }
+        .detail-header-title { flex: 1; font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text2); }
+        .detail-content { padding: 20px 16px; }
         .detail-title { font-size: 20px; font-weight: 700; line-height: 1.4; margin-bottom: 12px; }
-        .detail-meta { display: flex; gap: 12px; color: var(--text2); font-size: 13px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-        .detail-text { font-size: 16px; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
-        .detail-link { display: inline-block; margin-top: 20px; padding: 12px 20px; background: var(--primary); color: white; border-radius: 8px; text-decoration: none; font-weight: 500; }
+        .detail-meta { display: flex; gap: 12px; color: var(--text2); font-size: 13px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .detail-text { font-size: 15px; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
+        .detail-link { display: inline-block; margin-top: 20px; padding: 12px 24px; background: var(--primary-gradient); color: white; border-radius: 20px; text-decoration: none; font-weight: 500; box-shadow: 0 2px 8px rgba(102,126,234,0.3); }
         .detail-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-        .detail-tab { flex: 1; padding: 12px; text-align: center; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; }
+        .detail-tab { flex: 1; padding: 12px; text-align: center; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s; }
         .detail-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .detail-tab:hover { color: var(--primary); }
+        .original-title-box { background: rgba(102,126,234,0.1); padding: 12px 16px; border-radius: 14px; margin-bottom: 16px; border-left: 3px solid var(--primary); }
+        .original-title-label { font-size: 11px; color: var(--primary); margin-bottom: 4px; font-weight: 500; }
+        .original-title-text { font-size: 14px; color: var(--text2); line-height: 1.5; }
         
         /* Spotify-style Audio Page - Theme Adaptive */
         .audio-page-content { background: var(--bg); min-height: calc(100vh - 140px); }
-        .audio-header { padding: 24px 16px 16px; background: linear-gradient(180deg, rgba(0,122,255,0.15) 0%, var(--bg) 100%); }
-        .dark .audio-header { background: linear-gradient(180deg, #1a3a2a 0%, #121212 100%); }
+        .audio-header { padding: 24px 16px 16px; background: linear-gradient(180deg, rgba(102,126,234,0.15) 0%, var(--bg) 100%); }
+        .dark .audio-header { background: linear-gradient(180deg, rgba(102,126,234,0.2) 0%, #0d0d0d 100%); }
         .audio-header h2 { font-size: 24px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
         .audio-header-meta { font-size: 13px; color: var(--text2); }
         .audio-controls { display: flex; align-items: center; gap: 16px; padding: 16px; }
         .shuffle-btn { color: var(--primary); font-size: 24px; cursor: pointer; }
-        .dark .shuffle-btn { color: #1db954; }
-        .play-all-btn { width: 48px; height: 48px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; box-shadow: 0 8px 16px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.1s ease, background 0.2s ease; }
-        .dark .play-all-btn { background: #1db954; color: #000; }
-        .play-all-btn:hover { transform: scale(1.06); }
+        .play-all-btn { width: 52px; height: 52px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; box-shadow: 0 8px 20px rgba(102,126,234,0.35); cursor: pointer; transition: transform 0.15s ease, box-shadow 0.2s ease; }
+        .play-all-btn:hover { transform: scale(1.06); box-shadow: 0 10px 28px rgba(102,126,234,0.45); }
         .audio-list-spotify { padding: 0 12px; }
-        .audio-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 4px; cursor: pointer; transition: background 0.2s ease; }
-        .audio-item:hover { background: var(--border); }
-        .dark .audio-item:hover { background: #282828; }
-        .audio-item.playing { background: var(--border); }
-        .dark .audio-item.playing { background: #282828; }
+        .audio-section-label { padding: 12px 16px 8px; font-size: 12px; color: var(--primary); font-weight: 600; }
+        .audio-section-label.completed { color: var(--text2); }
+        .audio-item { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 16px; cursor: pointer; transition: background 0.2s ease, border-color 0.2s; margin-bottom: 8px; background: var(--card); border: 1px solid transparent; }
+        .dark .audio-item { background: var(--card-gradient); border: 1px solid rgba(255,255,255,0.05); }
+        .audio-item:hover { background: rgba(102,126,234,0.08); border-color: rgba(102,126,234,0.2); }
+        .audio-item.playing { background: rgba(102,126,234,0.12); border-color: rgba(102,126,234,0.3); }
         .audio-item.playing .audio-item-title { color: var(--primary); }
-        .dark .audio-item.playing .audio-item-title { color: #1db954; }
-        .audio-num { width: 16px; font-size: 14px; color: var(--text2); text-align: right; }
+        .audio-item.processing { border-color: rgba(102,126,234,0.3); }
+        .audio-num { width: 20px; font-size: 14px; color: var(--text2); text-align: center; }
         .audio-item:hover .audio-num, .audio-item.playing .audio-num { display: none; }
-        .audio-play-icon { display: none; width: 16px; font-size: 12px; color: var(--text); text-align: center; }
+        .audio-play-icon { display: none; width: 20px; font-size: 12px; color: var(--text); text-align: center; }
         .audio-item:hover .audio-play-icon { display: block; }
         .audio-item.playing .audio-play-icon { display: block; color: var(--primary); }
-        .dark .audio-item.playing .audio-play-icon { color: #1db954; }
-        .audio-cover { width: 40px; height: 40px; border-radius: 4px; background: linear-gradient(135deg, rgba(0,122,255,0.2) 0%, rgba(0,122,255,0.1) 100%); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-        .dark .audio-cover { background: linear-gradient(135deg, #1a3a2a 0%, #0d1f15 100%); }
+        .audio-cover { width: 48px; height: 48px; border-radius: 12px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
         .audio-item-info { flex: 1; min-width: 0; }
-        .audio-item-title { font-size: 15px; font-weight: 400; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
-        .audio-item-artist { font-size: 13px; color: var(--text2); }
-        .audio-duration { font-size: 13px; color: var(--text2); margin-left: auto; }
-        .audio-actions { display: flex; gap: 16px; margin-left: 8px; }
-        .action-btn { color: var(--text2); font-size: 16px; cursor: pointer; }
-        .action-btn:hover { color: var(--text); }
-        .action-btn.favorited { color: #ff3b30; }
-        .equalizer { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
-        .eq-bar { width: 3px; background: var(--primary); animation: eq 0.8s ease-in-out infinite; }
-        .dark .eq-bar { background: #1db954; }
+        .audio-item-title { font-size: 15px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+        .audio-item-artist { font-size: 12px; color: var(--text2); }
+        .audio-duration { font-size: 13px; color: var(--text2); margin-left: auto; font-weight: 500; }
+        .audio-actions { display: flex; gap: 12px; margin-left: 8px; }
+        .action-btn { color: var(--text2); font-size: 18px; cursor: pointer; padding: 4px; border-radius: 8px; transition: color 0.2s, background 0.2s; }
+        .action-btn:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+        .equalizer { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
+        .eq-bar { width: 3px; background: var(--primary); border-radius: 2px; animation: eq 0.8s ease-in-out infinite; }
         .eq-bar:nth-child(1) { height: 60%; animation-delay: 0s; }
         .eq-bar:nth-child(2) { height: 100%; animation-delay: 0.2s; }
         .eq-bar:nth-child(3) { height: 40%; animation-delay: 0.4s; }
         .eq-bar:nth-child(4) { height: 80%; animation-delay: 0.1s; }
         @keyframes eq { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.5); } }
-        .fab { position: fixed; right: 16px; bottom: 88px; width: 52px; height: 52px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer; z-index: 50; }
-        .dark .fab { background: #1db954; color: #000; }
+
+        /* Audio Progress in List */
+        .audio-progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 6px 0 4px; overflow: hidden; }
+        .audio-progress-fill { height: 100%; background: var(--primary-gradient); border-radius: 2px; transition: width 0.3s; }
+        .audio-status-text { font-size: 11px; color: var(--primary); }
+        .audio-status-text.failed { color: #ef4444; }
+
+        .fab { position: fixed; right: 16px; bottom: 88px; width: 56px; height: 56px; border-radius: 50%; background: var(--primary-gradient); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; box-shadow: 0 6px 20px rgba(102,126,234,0.4); cursor: pointer; z-index: 50; transition: transform 0.2s, box-shadow 0.2s; }
+        .fab:hover { transform: scale(1.05); box-shadow: 0 8px 28px rgba(102,126,234,0.5); }
+
         /* Spotify-style Player - Theme Adaptive */
-        .player { position: fixed; left: 0; right: 0; bottom: 60px; height: 72px; background: var(--card); border-top: 1px solid var(--border); display: none; z-index: 90; padding: 0 16px; }
-        .dark .player { background: linear-gradient(180deg, #282828 0%, #181818 100%); border-top: 1px solid #282828; }
+        .player { position: fixed; left: 0; right: 0; bottom: 60px; height: 76px; background: var(--card); border-top: 1px solid var(--border); display: none; z-index: 90; padding: 0 16px; }
+        .dark .player { background: linear-gradient(180deg, #1c1c2e 0%, #16162a 100%); border-top: 1px solid #2a2a3e; }
         .player.show { display: flex; align-items: center; gap: 12px; }
         .np-progress { position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--border); cursor: pointer; }
-        .dark .np-progress { background: #404040; }
-        .np-progress-fill { height: 100%; background: var(--primary); position: relative; transition: width 0.1s; }
-        .dark .np-progress-fill { background: #1db954; }
+        .np-progress-fill { height: 100%; background: var(--primary-gradient); position: relative; transition: width 0.1s; }
         .np-progress:hover .np-progress-fill { filter: brightness(1.1); }
-        .np-cover { width: 56px; height: 56px; border-radius: 4px; background: linear-gradient(135deg, rgba(0,122,255,0.2) 0%, rgba(0,122,255,0.1) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
-        .dark .np-cover { background: linear-gradient(135deg, #1a3a2a 0%, #0d1f15 100%); }
+        .np-cover { width: 56px; height: 56px; border-radius: 12px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
         .np-info { flex: 1; min-width: 0; }
-        .np-title { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .np-artist { font-size: 11px; color: var(--text2); }
-        .np-controls { display: flex; align-items: center; gap: 20px; }
-        .np-btn { color: var(--text2); font-size: 20px; cursor: pointer; transition: color 0.1s ease; }
+        .np-title { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .np-artist { font-size: 12px; color: var(--text2); margin-top: 2px; }
+        .np-controls { display: flex; align-items: center; gap: 16px; }
+        .np-btn { color: var(--text2); font-size: 20px; cursor: pointer; transition: color 0.15s ease; }
         .np-btn:hover { color: var(--text); }
-        .np-btn.main { width: 32px; height: 32px; background: var(--primary); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-        .dark .np-btn.main { background: #fff; color: #000; }
-        .np-btn.seek-btn { font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 4px; background: var(--border); color: var(--text); }
+        .np-btn.main { width: 40px; height: 40px; background: var(--primary-gradient); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 8px rgba(102,126,234,0.3); transition: transform 0.15s, box-shadow 0.2s; }
+        .np-btn.main:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+        .np-btn.seek-btn { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; background: var(--border); color: var(--text); transition: background 0.2s, color 0.2s; }
         .np-btn.seek-btn:hover { background: var(--primary); color: #fff; }
         .audio-empty { text-align: center; padding: 60px 20px; color: var(--text2); }
-        .audio-empty-icon { font-size: 48px; margin-bottom: 12px; }
-        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
-        .toggle { width: 48px; height: 28px; border-radius: 14px; background: var(--border); position: relative; cursor: pointer; }
-        .toggle.on { background: var(--primary); }
-        .toggle::after { content: ''; position: absolute; width: 24px; height: 24px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: 0.2s; }
-        .toggle.on::after { left: 22px; }
-        .hours-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
-        .hour-btn { padding: 10px; text-align: center; background: var(--bg); border-radius: 8px; font-size: 13px; cursor: pointer; }
-        .hour-btn.selected { background: var(--primary); color: #fff; }
+        .audio-empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.5; }
+        .audio-empty-icon i { width: 56px; height: 56px; }
+        .audio-item.failed .audio-item-title { color: #ef4444; }
+        .spinning { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
+        .toggle { width: 52px; height: 30px; border-radius: 15px; background: var(--border); position: relative; cursor: pointer; transition: background 0.2s; }
+        .toggle.on { background: var(--primary-gradient); }
+        .toggle::after { content: ''; position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .toggle.on::after { left: 24px; }
+        .hours-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+        .hour-btn { padding: 12px; text-align: center; background: var(--bg); border-radius: 12px; font-size: 13px; cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.15s; }
+        .hour-btn:hover { background: rgba(102,126,234,0.1); }
+        .hour-btn:active { transform: scale(0.95); }
+        .hour-btn.selected { background: var(--primary-gradient); color: #fff; }
         .empty { text-align: center; padding: 60px 20px; color: var(--text2); }
-        .empty-icon { font-size: 48px; margin-bottom: 12px; }
-        .btn { padding: 12px 20px; border-radius: 10px; font-size: 15px; font-weight: 600; text-align: center; cursor: pointer; border: none; }
-        .btn-primary { background: var(--primary); color: #fff; }
-        .card { background: var(--card); border-radius: 12px; padding: 14px; margin: 12px; }
-        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; display: none; align-items: flex-end; }
+        .empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.5; }
+        .btn { padding: 14px 24px; border-radius: 20px; font-size: 15px; font-weight: 600; text-align: center; cursor: pointer; border: none; transition: transform 0.15s, box-shadow 0.2s; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--primary-gradient); color: #fff; box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+        .btn-primary:hover { box-shadow: 0 6px 20px rgba(102,126,234,0.4); }
+        .card { background: var(--card); border-radius: 20px; padding: 16px; margin: 12px; border: 1px solid rgba(255,255,255,0.05); }
+        .dark .card { background: var(--card-gradient); }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 200; display: none; align-items: flex-end; backdrop-filter: blur(4px); }
         .modal.show { display: flex; }
-        .modal-content { background: var(--card); width: 100%; max-height: 80vh; border-radius: 20px 20px 0 0; overflow: hidden; }
-        .modal-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        .modal-content { background: var(--card); width: 100%; max-height: 80vh; border-radius: 24px 24px 0 0; overflow: hidden; }
+        .dark .modal-content { background: #1c1c2e; }
+        .modal-header { padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         .modal-body { padding: 16px; overflow-y: auto; max-height: calc(80vh - 56px); }
-        .modal-close { font-size: 24px; cursor: pointer; color: var(--text2); }
-        .checkbox { width: 22px; height: 22px; border: 2px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; }
-        .checkbox.checked { background: var(--primary); border-color: var(--primary); color: #fff; }
-        .checkbox.disabled { background: var(--border); border-color: var(--border); cursor: not-allowed; }
-        .select-item.disabled { opacity: 0.6; cursor: not-allowed; }
-        .select-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .modal-close { font-size: 24px; cursor: pointer; color: var(--text2); transition: color 0.2s; }
+        .modal-close:hover { color: var(--text); }
+        .checkbox { width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; transition: background 0.2s, border-color 0.2s; }
+        .checkbox.checked { background: var(--primary-gradient); border-color: var(--primary); color: #fff; }
+        .checkbox.disabled { background: var(--border); border-color: var(--border); cursor: not-allowed; opacity: 0.5; }
+        .select-item.disabled { opacity: 0.5; cursor: not-allowed; }
+        .select-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); transition: opacity 0.2s; }
         .loading { text-align: center; padding: 20px; color: var(--text2); }
-        .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
@@ -173,21 +219,24 @@
         <!-- News Page -->
         <div id="news-page" class="page active">
             <div class="header">
-                <h1>AI News</h1>
-                <button id="refresh-btn" class="header-btn" onclick="fetchNews()">拉取</button>
+                <h1>AI 资讯</h1>
+                <button id="refresh-btn" class="header-btn" onclick="fetchNews()">刷新</button>
             </div>
-            <div id="news-list" class="news-list"></div>
+            <div id="news-list" class="news-list"><div class="loading"><span class="spinner"></span> 加载中...</div></div>
         </div>
 
         <!-- Audio Page -->
         <div id="audio-page" class="page">
             <div class="audio-page-content">
+                <div class="header" style="background:var(--card)">
+                    <h1>播客</h1>
+                    <button class="header-btn" onclick="showNewsSelector()">+ 新建</button>
+                </div>
                 <div class="audio-header">
-                    <h2>Audio</h2>
-                    <div class="audio-header-meta" id="audio-meta">0 episodes</div>
+                    <div class="audio-header-meta" id="audio-meta">0 集</div>
                 </div>
                 <div class="audio-controls" id="audio-controls" style="display:none">
-                    <select id="audio-sort" onchange="loadAudio()" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
+                    <select id="audio-sort" onchange="loadAudio()" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:8px 12px;font-size:13px;outline:none;">
                         <option value="created_at-desc">最新</option>
                         <option value="created_at-asc">最早</option>
                         <option value="title-asc">标题 A-Z</option>
@@ -197,30 +246,30 @@
                 </div>
                 <div id="audio-list" class="audio-list-spotify"></div>
             </div>
-            <div class="fab" onclick="showNewsSelector()">+</div>
         </div>
 
         <!-- Settings Page -->
         <div id="settings-page" class="page">
-            <div class="header"><h1>Settings</h1></div>
+            <div class="header"><h1>设置</h1></div>
             <div class="card">
                 <div class="setting-item">
-                    <span>Dark Mode</span>
+                    <span>深色模式</span>
                     <div id="theme-toggle" class="toggle" onclick="toggleTheme()"></div>
                 </div>
             </div>
             <div class="card">
-                <div>Auto-fetch Hours</div>
+                <div style="font-weight:500;margin-bottom:4px;">自动抓取时间</div>
+                <div style="font-size:12px;color:var(--text2);">选择每天自动获取新闻的时间</div>
                 <div id="hours-grid" class="hours-grid"></div>
             </div>
-            <div style="padding:16px"><button class="btn btn-primary" style="width:100%" onclick="saveSettings()">Save</button></div>
+            <div style="padding:16px"><button class="btn btn-primary" style="width:100%" onclick="saveSettings()">保存设置</button></div>
         </div>
 
         <!-- Tab Bar -->
         <div class="tabs">
-            <div class="tab active" onclick="showPage('news')"><div class="tab-icon">📰</div>News</div>
-            <div class="tab" onclick="showPage('audio')"><div class="tab-icon">🎧</div>Audio</div>
-            <div class="tab" onclick="showPage('settings')"><div class="tab-icon">⚙️</div>Settings</div>
+            <div class="tab active" onclick="showPage('news')"><div class="tab-icon">📰</div>资讯</div>
+            <div class="tab" onclick="showPage('audio')"><div class="tab-icon">🎧</div>播客</div>
+            <div class="tab" onclick="showPage('settings')"><div class="tab-icon">⚙️</div>设置</div>
         </div>
     </div>
 
@@ -242,11 +291,14 @@
         <div class="detail-content">
             <div style="margin-bottom:16px">
                 <label style="font-size:14px;color:var(--text2);display:block;margin-bottom:6px">音频标题 (可选)</label>
-                <input type="text" id="audio-title-input" placeholder="留空则自动生成" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:15px;background:var(--card);color:var(--text)">
+                <input type="text" id="audio-title-input" placeholder="留空则自动生成" style="width:100%;padding:14px 16px;border:1px solid var(--border);border-radius:14px;font-size:15px;background:var(--card);color:var(--text);outline:none;transition:border-color 0.2s;">
             </div>
             <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
                 <span style="font-size:14px;color:var(--text2)">选择新闻</span>
-                <span id="ready-count" style="font-size:12px;color:var(--primary)"></span>
+                <div>
+                    <span id="select-all-btn" onclick="selectAllNews()" style="color:var(--primary);cursor:pointer;font-size:13px;margin-right:12px">全选</span>
+                    <span id="ready-count" style="font-size:12px;color:var(--text2)"></span>
+                </div>
             </div>
             <div id="selector-list" style="margin-bottom:16px"></div>
             <button class="btn btn-primary" style="width:100%;position:sticky;bottom:16px" onclick="createAudio()">生成音频</button>
@@ -270,6 +322,12 @@
     </div>
 
     <script>
+        // Global error handler
+        window.onerror = function(msg, url, line, col, error) {
+            document.body.innerHTML = '<div style="padding:20px;color:red;font-size:14px;"><h3>JS Error</h3><p>' + msg + '</p><p>Line: ' + line + '</p><p>' + (error ? error.stack : '') + '</p></div>';
+            return false;
+        };
+
         const API = '';
         let token = localStorage.getItem('token');
         let currentNews = [];
@@ -277,27 +335,54 @@
         let settings = { fetch_hours: ['8','12','18'] };
         let audio = null;
 
+        // Debug helper
+        function log(msg) {
+            console.log('[AI资讯]', msg);
+        }
+
         async function init() {
-            if (!token) await login();
-            loadTheme();
-            loadNews();
-            loadAudio();
-            loadSettings();
-            renderHoursGrid();
+            log('Init started');
+            try {
+                if (!token) {
+                    log('No token, logging in...');
+                    await login();
+                }
+                log('Token ready, loading data...');
+                loadTheme();
+                await loadNews();
+                await loadAudio();
+                await loadSettings();
+                renderHoursGrid();
+                log('Init completed');
+            } catch (e) {
+                console.error('Init error:', e);
+                document.getElementById('news-list').innerHTML = '<div class="empty"><div>加载失败</div><div style="margin-top:8px;font-size:13px">' + e.message + '</div></div>';
+            }
         }
 
         async function login() {
-            const res = await fetch(API + '/api/v1/auth/dev-login', { method: 'POST' });
-            const data = await res.json();
-            token = data.access_token;
-            localStorage.setItem('token', token);
+            try {
+                log('Calling login API...');
+                const res = await fetch(API + '/api/v1/auth/dev-login', { method: 'POST' });
+                const data = await res.json();
+                token = data.access_token;
+                localStorage.setItem('token', token);
+                log('Login success');
+            } catch (e) {
+                console.error('Login error:', e);
+                throw e;
+            }
         }
 
         function api(url, options = {}) {
+            log('API call: ' + url);
             return fetch(API + url, {
                 ...options,
                 headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...options.headers }
-            }).then(r => r.json());
+            }).then(r => r.json()).catch(e => {
+                console.error('API error:', url, e);
+                return { items: [], error: e.message };
+            });
         }
 
         function showPage(name) {
@@ -311,7 +396,7 @@
         }
 
         async function loadNews() {
-            document.getElementById('news-list').innerHTML = '<div class="loading"><span class="spinner"></span> Loading...</div>';
+            document.getElementById('news-list').innerHTML = '<div class="loading"><span class="spinner"></span> 加载中...</div>';
             const data = await api('/api/v1/news?limit=50');
             currentNews = data.items || [];
             renderNews();
@@ -333,20 +418,34 @@
         function renderNews() {
             const list = document.getElementById('news-list');
             if (!currentNews.length) {
-                list.innerHTML = '<div class="empty"><div class="empty-icon">📰</div><div>No news yet</div><div style="margin-top:8px;font-size:13px">Tap 拉取 to fetch</div></div>';
+                list.innerHTML = '<div class="empty"><div class="empty-icon">📰</div><div>暂无资讯</div><div style="margin-top:8px;font-size:13px">点击刷新获取最新内容</div></div>';
                 return;
             }
             list.innerHTML = currentNews.map((n, i) => `
                 <div class="news-card" onclick="showDetail(${i})">
-                    <div class="news-title">${n.title}</div>
+                    <div class="news-title">${n.title_zh || n.title}</div>
                     <div class="news-meta">
                         <span class="news-source">${n.source_name}</span>
-                        <span class="news-time">${n.published_at || ''}</span>
+                        <span class="news-time">${formatRelativeTime(n.published_at)}</span>
                         ${n.category === 'ai' ? '<span class="badge badge-ai">AI</span>' : ''}
-                        ${(n.final_score || 0) > 0.8 ? '<span class="badge badge-hot">Hot</span>' : ''}
+                        ${(n.final_score || 0) > 0.8 ? '<span class="badge badge-hot">热门</span>' : ''}
                     </div>
                 </div>
             `).join('');
+        }
+
+        function formatRelativeTime(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            if (minutes < 60) return minutes + '分钟前';
+            if (hours < 24) return hours + '小时前';
+            if (days < 7) return days + '天前';
+            return (date.getMonth()+1) + '月' + date.getDate() + '日';
         }
 
         // Progress functions
@@ -422,38 +521,84 @@
             refined = refined.replace(/\[\+\d+ chars\]$/, '').trim();
             original = original.replace(/\[\+\d+ chars\]$/, '').trim();
 
+            // Check if we have English title different from Chinese
+            const hasEnglishTitle = n.title_zh && n.title !== n.title_zh;
+
             // Store for tab switching
-            window.detailContent = { refined, original };
+            window.detailContent = {
+                refined,
+                original,
+                englishTitle: hasEnglishTitle ? n.title : null,
+                url: n.source_url || ''
+            };
 
             document.getElementById('detail-body').innerHTML = `
                 <div class="detail-content">
-                    <div class="detail-title">${n.title}</div>
+                    <div class="detail-title">${n.title_zh || n.title}</div>
                     <div class="detail-meta">
                         <span class="news-source">${n.source_name}</span>
-                        <span>${n.published_at || ''}</span>
+                        <span>${formatRelativeTime(n.published_at)}</span>
                         ${n.category === 'ai' ? '<span class="badge badge-ai">AI</span>' : ''}
                     </div>
                     <div class="detail-tabs">
                         <div class="detail-tab active" onclick="switchTab('original')">原文</div>
                         <div class="detail-tab" onclick="switchTab('refined')">精炼</div>
-                        ${n.source_url ? `<div class="detail-tab" onclick="window.open('${n.source_url}', '_blank')">阅读原文</div>` : ''}
+                        ${n.source_url ? `<div class="detail-tab" onclick="switchTab('link')">阅读原文</div>` : ''}
                     </div>
+                    ${hasEnglishTitle ? `
+                    <div class="original-title-box">
+                        <div class="original-title-label">📌 英文原标题</div>
+                        <div class="original-title-text">${n.title}</div>
+                    </div>` : ''}
                     <div id="detail-text" class="detail-text">${original || '暂无原文内容'}</div>
+                    <div id="detail-link-panel" style="display:none">
+                        <div style="padding:14px;background:rgba(102,126,234,0.1);border-radius:14px;border:1px solid rgba(102,126,234,0.2);">
+                            <div style="font-size:12px;color:var(--text2);margin-bottom:8px">🔗 原文链接</div>
+                            <div style="font-size:13px;word-break:break-all;color:var(--primary);line-height:1.5;margin-bottom:12px">${n.source_url || ''}</div>
+                            <div style="display:flex;gap:10px">
+                                <button onclick="copyLink(window.detailContent.url)" style="flex:1;padding:10px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:10px;font-size:13px;cursor:pointer">复制链接</button>
+                                <button onclick="window.open(window.detailContent.url, '_blank')" style="flex:1;padding:10px;border:none;background:var(--primary-gradient);color:#fff;border-radius:10px;font-size:13px;cursor:pointer">打开链接</button>
+                                <button onclick="shareLink(window.detailContent.url)" style="flex:1;padding:10px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:10px;font-size:13px;cursor:pointer">分享</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
             document.getElementById('detail-page').classList.add('show');
+            document.body.style.overflow = 'hidden';
         }
 
         function switchTab(type) {
             const tabs = document.querySelectorAll('.detail-tab');
             tabs[0].classList.toggle('active', type === 'original');
             tabs[1].classList.toggle('active', type === 'refined');
-            const content = type === 'refined' ? window.detailContent.refined : window.detailContent.original;
-            document.getElementById('detail-text').textContent = content || (type === 'refined' ? '精炼生成中...' : '原文无法抓取');
+            if (tabs[2]) tabs[2].classList.toggle('active', type === 'link');
+
+            const textEl = document.getElementById('detail-text');
+            const linkEl = document.getElementById('detail-link-panel');
+
+            if (type === 'link') {
+                textEl.style.display = 'none';
+                linkEl.style.display = 'block';
+            } else {
+                textEl.style.display = 'block';
+                linkEl.style.display = 'none';
+                const content = type === 'refined' ? window.detailContent.refined : window.detailContent.original;
+                textEl.textContent = content || (type === 'refined' ? '精炼生成中...' : '暂无原文内容');
+            }
+        }
+
+        function shareLink(url) {
+            if (navigator.share) {
+                navigator.share({ title: document.querySelector('.detail-title')?.textContent || 'AI资讯', url: url }).catch(() => {});
+            } else {
+                copyLink(url);
+            }
         }
 
         function closeDetail() {
             document.getElementById('detail-page').classList.remove('show');
+            document.body.style.overflow = '';
         }
 
         async function loadAudio() {
@@ -469,32 +614,129 @@
 
             // Update header meta
             const totalDuration = list.reduce((sum, a) => sum + (a.duration || 0), 0);
-            document.getElementById('audio-meta').textContent = `${list.length} episodes · ${formatDuration(totalDuration)}`;
+            document.getElementById('audio-meta').textContent = `${list.length} 集 · 总时长 ${formatDuration(totalDuration)}`;
             document.getElementById('audio-controls').style.display = list.length ? 'flex' : 'none';
 
             if (!list.length) {
-                document.getElementById('audio-list').innerHTML = '<div class="audio-empty"><div class="audio-empty-icon">🎧</div><div>No audio yet</div><div style="margin-top:8px;font-size:13px;color:#b3b3b3">Tap + to create</div></div>';
+                document.getElementById('audio-list').innerHTML = '<div class="audio-empty"><div class="audio-empty-icon">🎧</div><div>暂无播客</div><div style="margin-top:8px;font-size:13px;color:#b3b3b3">点击右上角新建</div></div>';
                 return;
             }
 
-            document.getElementById('audio-list').innerHTML = list.map((a, i) => `
-                <div class="audio-item ${window.currentPlayingIdx === i ? 'playing' : ''}" onclick="playAudio(${i})" data-idx="${i}">
-                    <span class="audio-num">${i + 1}</span>
-                    <span class="audio-play-icon">${window.currentPlayingIdx === i ? '<div class="equalizer"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>' : '▶'}</span>
-                    <div class="audio-item-info">
-                        <div class="audio-item-title">${a.title}</div>
-                        <div class="audio-item-artist">${formatDateTime(a.created_at)}</div>
-                    </div>
-                    <span class="audio-duration">${formatDuration(a.duration)}</span>
-                    <div class="audio-actions">
-                        <span class="action-btn" onclick="event.stopPropagation();confirmDelete(${a.id})">🗑</span>
-                    </div>
-                </div>
-            `).join('');
+            // Separate processing and completed items
+            const processingItems = list.filter(a => a.status === 'processing' || a.status === 'pending');
+            const completedItems = list.filter(a => a.status === 'completed' || a.status === 'failed');
+
+            let html = '';
+
+            // Show processing items first with progress
+            if (processingItems.length > 0) {
+                html += '<div class="audio-section-label">生成中</div>';
+                processingItems.forEach((a, i) => {
+                    html += `
+                    <div class="audio-item processing" data-id="${a.id}">
+                        <div class="audio-cover">🎙️</div>
+                        <div class="audio-item-info">
+                            <div class="audio-item-title">${a.title || '正在生成...'}</div>
+                            <div class="audio-progress-bar"><div class="audio-progress-fill" id="progress-${a.id}" style="width:0%"></div></div>
+                            <div class="audio-status-text" id="status-${a.id}">准备中...</div>
+                        </div>
+                    </div>`;
+                });
+            }
+
+            // Show completed items
+            if (completedItems.length > 0) {
+                html += `<div class="audio-section-label completed">已完成 · ${completedItems.length} 集</div>`;
+                completedItems.forEach((a, i) => {
+                    const isPlaying = window.currentPlayingId === a.id;
+                    html += `
+                    <div class="audio-item ${isPlaying ? 'playing' : ''} ${a.status === 'failed' ? 'failed' : ''}" onclick="playAudio(${a.id})" data-id="${a.id}">
+                        <span class="audio-num">${i + 1}</span>
+                        <span class="audio-play-icon">${isPlaying ? '<div class="equalizer"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>' : '▶'}</span>
+                        <div class="audio-cover">🎧</div>
+                        <div class="audio-item-info">
+                            <div class="audio-item-title">${a.title}</div>
+                            <div class="audio-item-artist">${formatDateTime(a.created_at)}</div>
+                        </div>
+                        <span class="audio-duration">${a.status === 'failed' ? '<span style="color:#ef4444">失败</span>' : formatDuration(a.duration)}</span>
+                        <div class="audio-actions">
+                            <span class="action-btn" onclick="event.stopPropagation();confirmDelete(${a.id})">🗑️</span>
+                        </div>
+                    </div>`;
+                });
+            }
+
+            document.getElementById('audio-list').innerHTML = html;
+
+            // Start polling for processing items
+            if (processingItems.length > 0) {
+                processingItems.forEach(a => pollAudioProgress(a.id));
+            }
+        }
+
+        async function pollAudioProgress(audioId) {
+            try {
+                const status = await api(`/api/v1/audio/${audioId}/status`);
+                const progressEl = document.getElementById(`progress-${audioId}`);
+                const statusEl = document.getElementById(`status-${audioId}`);
+
+                if (progressEl) progressEl.style.width = (status.progress || 0) + '%';
+                if (statusEl) statusEl.textContent = status.message || '处理中...';
+
+                if (status.status === 'completed' || status.status === 'failed') {
+                    loadAudio();
+                } else {
+                    setTimeout(() => pollAudioProgress(audioId), 2000);
+                }
+            } catch (e) {
+                console.error('Poll error:', e);
+                setTimeout(() => pollAudioProgress(audioId), 3000);
+            }
+        }
+
+        function playAudio(audioId) {
+            const a = window.audioList.find(x => x.id === audioId);
+            if (!a) return;
+            if (a.status === 'failed') {
+                showAudioError(a.error_message);
+                return;
+            }
+            if (a.status !== 'completed') {
+                showToast(a.status === 'processing' ? '音频生成中...' : '音频准备中...');
+                return;
+            }
+            if (audio) audio.pause();
+            window.currentPlayingId = audioId;
+            audio = new Audio(API + '/api/v1/audio/' + a.id + '/stream?token=' + token);
+            audio.play();
+            document.getElementById('player-title').textContent = a.title;
+            document.getElementById('player').classList.add('show');
+            document.getElementById('play-btn').innerHTML = '⏸';
+            audio.ontimeupdate = () => {
+                document.getElementById('player-time').textContent = formatDuration(audio.currentTime) + ' / ' + formatDuration(audio.duration || 0);
+                const percent = audio.duration ? (audio.currentTime / audio.duration * 100) : 0;
+                document.getElementById('np-progress-fill').style.width = percent + '%';
+            };
+            audio.onended = () => {
+                document.getElementById('play-btn').innerHTML = '▶';
+                // Auto play next
+                const idx = window.audioList.findIndex(x => x.id === audioId);
+                if (idx >= 0 && idx + 1 < window.audioList.length) {
+                    const nextCompleted = window.audioList.slice(idx + 1).find(x => x.status === 'completed');
+                    if (nextCompleted) playAudio(nextCompleted.id);
+                    else hidePlayer();
+                } else hidePlayer();
+            };
+            // Update playing state in list
+            document.querySelectorAll('.audio-item').forEach(el => {
+                const id = parseInt(el.dataset.id);
+                el.classList.toggle('playing', id === audioId);
+            });
         }
 
         function playAllAudio() {
-            if (window.audioList && window.audioList.length) playAudio(0);
+            const first = window.audioList && window.audioList.find(a => a.status === 'completed');
+            if (first) playAudio(first.id);
         }
 
         function seekToPosition(e) {
@@ -510,13 +752,12 @@
 
             // Filter news: only show ready ones as selectable, others as disabled
             const readyNews = currentNews.filter(n => n.content_status === 'ready');
-            const pendingNews = currentNews.filter(n => n.content_status !== 'ready');
 
-            document.getElementById('ready-count').textContent = `${readyNews.length}/${currentNews.length} 篇已就绪`;
+            document.getElementById('ready-count').textContent = `${readyNews.length} 篇可用 (最多选20篇)`;
 
             let html = '';
-            // Ready news (selectable)
-            currentNews.slice(0, 30).forEach((n, i) => {
+            // Show all news (selectable up to 20)
+            currentNews.forEach((n, i) => {
                 const isReady = n.content_status === 'ready';
                 const statusText = n.content_status === 'pending' ? '精炼中...' :
                                    n.content_status === 'generating' ? '生成中...' :
@@ -525,7 +766,7 @@
                 <div class="select-item ${!isReady ? 'disabled' : ''}" onclick="${isReady ? `toggleSelect(${i})` : ''}">
                     <div id="check-${i}" class="checkbox ${!isReady ? 'disabled' : ''}"></div>
                     <div style="flex:1;min-width:0">
-                        <div style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${!isReady ? 'color:var(--text2)' : ''}">${n.title}</div>
+                        <div style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${!isReady ? 'color:var(--text2)' : ''}">${n.title_zh || n.title}</div>
                         <div style="font-size:12px;color:var(--text2)">${n.source_name}${statusText ? ' · <span style="color:' + (n.content_status === 'failed' ? '#ff3b30' : 'var(--primary)') + '">' + statusText + '</span>' : ''}</div>
                     </div>
                 </div>`;
@@ -538,11 +779,60 @@
         function toggleSelect(i) {
             const id = currentNews[i].id;
             const idx = selectedNews.indexOf(id);
-            if (idx > -1) selectedNews.splice(idx, 1);
-            else selectedNews.push(id);
+            if (idx > -1) {
+                // Deselect
+                selectedNews.splice(idx, 1);
+            } else {
+                // Check if already at max (20)
+                if (selectedNews.length >= 20) {
+                    showToast('最多只能选择20篇新闻');
+                    return;
+                }
+                selectedNews.push(id);
+            }
             const el = document.getElementById('check-' + i);
             el.classList.toggle('checked', selectedNews.includes(id));
             el.textContent = selectedNews.includes(id) ? '✓' : '';
+            updateSelectAllBtn();
+        }
+
+        function selectAllNews() {
+            // Get first 20 ready news items
+            const readyNews = currentNews.filter(n => n.content_status === 'ready').slice(0, 20);
+            const readyIds = readyNews.map(n => n.id);
+
+            if (selectedNews.length === readyIds.length && readyIds.every(id => selectedNews.includes(id))) {
+                // Deselect all
+                selectedNews = [];
+                currentNews.forEach((n, i) => {
+                    const el = document.getElementById('check-' + i);
+                    if (el && !el.classList.contains('disabled')) {
+                        el.classList.remove('checked');
+                        el.textContent = '';
+                    }
+                });
+            } else {
+                // Select first 20 ready news
+                selectedNews = [...readyIds];
+                currentNews.forEach((n, i) => {
+                    const el = document.getElementById('check-' + i);
+                    if (el && !el.classList.contains('disabled')) {
+                        const isSelected = selectedNews.includes(n.id);
+                        el.classList.toggle('checked', isSelected);
+                        el.textContent = isSelected ? '✓' : '';
+                    }
+                });
+            }
+            updateSelectAllBtn();
+        }
+
+        function updateSelectAllBtn() {
+            const readyNews = currentNews.filter(n => n.content_status === 'ready').slice(0, 20);
+            const btn = document.getElementById('select-all-btn');
+            if (btn) {
+                const allSelected = readyNews.length > 0 && readyNews.every(n => selectedNews.includes(n.id));
+                btn.textContent = allSelected ? '取消全选' : '全选';
+            }
         }
 
         async function createAudio() {
@@ -550,25 +840,20 @@
             const customTitle = document.getElementById('audio-title-input').value.trim();
             closeModal('selector-modal');
 
-            // Show progress
-            showProgress('正在创建音频...', 0);
-
             try {
                 const body = { news_ids: selectedNews, language: 'zh' };
                 if (customTitle) body.title = customTitle;
                 const result = await api('/api/v1/audio', { method: 'POST', body: JSON.stringify(body) });
 
                 if (result.id) {
-                    // Poll for status
-                    await pollAudioStatus(result.id);
+                    // Immediately refresh list to show processing item
+                    await loadAudio();
+                    showToast('音频生成中，请稍候...');
                 }
             } catch (e) {
                 console.error('Audio creation error:', e);
-                hideProgress();
                 alert('创建失败: ' + e.message);
             }
-
-            loadAudio();
         }
 
         async function pollAudioStatus(audioId) {
@@ -599,48 +884,9 @@
             hideProgress();
         }
 
-        function playAudio(i) {
-            const a = window.audioList[i];
-            if (a.status !== 'completed') {
-                showToast(a.status === 'processing' ? '音频生成中...' : a.status === 'failed' ? '音频生成失败' : '音频准备中...');
-                return;
-            }
-            if (audio) audio.pause();
-            window.currentPlayingIdx = i;
-            audio = new Audio(API + '/api/v1/audio/' + a.id + '/stream?token=' + token);
-            audio.play();
-            document.getElementById('player-title').textContent = a.title;
-            document.getElementById('player').classList.add('show');
-            document.getElementById('play-btn').textContent = '⏸';
-            // Adjust FAB position when player shows
-            const fab = document.querySelector('.fab');
-            if (fab) fab.style.bottom = '148px';
-            audio.ontimeupdate = () => {
-                document.getElementById('player-time').textContent = formatDuration(audio.currentTime) + ' / ' + formatDuration(audio.duration || 0);
-                const percent = audio.duration ? (audio.currentTime / audio.duration * 100) : 0;
-                document.getElementById('np-progress-fill').style.width = percent + '%';
-            };
-            audio.onended = () => {
-                document.getElementById('play-btn').textContent = '▶';
-                // Auto play next
-                if (i + 1 < window.audioList.length) playAudio(i + 1);
-                else hidePlayer();
-            };
-            // Update playing state in list without full reload
-            document.querySelectorAll('.audio-item').forEach((el, idx) => {
-                el.classList.toggle('playing', idx === i);
-                const playIcon = el.querySelector('.audio-play-icon');
-                if (playIcon) {
-                    playIcon.innerHTML = idx === i ? '<div class="equalizer"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>' : '▶';
-                }
-            });
-        }
-
         function hidePlayer() {
             document.getElementById('player').classList.remove('show');
-            const fab = document.querySelector('.fab');
-            if (fab) fab.style.bottom = '88px';
-            window.currentPlayingIdx = -1;
+            window.currentPlayingId = null;
         }
 
         function showToast(msg) {
@@ -648,7 +894,7 @@
             if (!toast) {
                 toast = document.createElement('div');
                 toast.id = 'toast';
-                toast.style.cssText = 'position:fixed;bottom:160px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;z-index:999;opacity:0;transition:opacity 0.3s';
+                toast.style.cssText = 'position:fixed;bottom:160px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:12px 24px;border-radius:20px;font-size:14px;z-index:999;opacity:0;transition:opacity 0.3s;box-shadow:0 4px 12px rgba(102,126,234,0.4);font-weight:500';
                 document.body.appendChild(toast);
             }
             toast.textContent = msg;
@@ -656,7 +902,16 @@
             setTimeout(() => { toast.style.opacity = '0'; }, 2000);
         }
 
-        function togglePlay() { if (!audio) return; audio.paused ? (audio.play(), document.getElementById('play-btn').textContent = '⏸') : (audio.pause(), document.getElementById('play-btn').textContent = '▶'); }
+        function togglePlay() {
+            if (!audio) return;
+            if (audio.paused) {
+                audio.play();
+                document.getElementById('play-btn').innerHTML = '⏸';
+            } else {
+                audio.pause();
+                document.getElementById('play-btn').innerHTML = '▶';
+            }
+        }
         function seekAudio(sec) { if (audio) audio.currentTime += sec; }
 
         async function toggleFavorite(audioId, idx) {
@@ -681,6 +936,37 @@
             }
         }
 
+        function copyLink(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                showToast('链接已复制');
+            }).catch(() => {
+                // Fallback for older browsers
+                const input = document.createElement('input');
+                input.value = url;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast('链接已复制');
+            });
+        }
+
+        function showAudioError(errorMsg) {
+            const userMsg = errorMsg || '生成失败，请稍后重试';
+            const modal = document.createElement('div');
+            modal.id = 'error-modal';
+            modal.innerHTML = `
+                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center" onclick="this.parentElement.remove()">
+                    <div style="background:var(--card);padding:24px;border-radius:16px;max-width:300px;margin:20px;box-shadow:0 8px 32px rgba(0,0,0,0.3)" onclick="event.stopPropagation()">
+                        <div style="font-size:16px;font-weight:600;margin-bottom:12px;color:#ef4444">⚠️ 生成失败</div>
+                        <div style="font-size:14px;color:var(--text);margin-bottom:16px;line-height:1.6">${userMsg}</div>
+                        <button onclick="document.getElementById('error-modal').remove()" style="width:100%;padding:12px;background:var(--primary-gradient);color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:500">知道了</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
         async function deleteAudio(audioId) {
             try {
                 const result = await api(`/api/v1/audio/${audioId}`, { method: 'DELETE' });
@@ -700,7 +986,7 @@
             `).join('');
         }
         function toggleHour(h) { const s = String(h), idx = settings.fetch_hours.indexOf(s); idx > -1 ? settings.fetch_hours.splice(idx, 1) : settings.fetch_hours.push(s); renderHoursGrid(); }
-        async function saveSettings() { await api('/api/v1/settings', { method: 'PUT', body: JSON.stringify(settings) }); alert('Saved!'); }
+        async function saveSettings() { await api('/api/v1/settings', { method: 'PUT', body: JSON.stringify(settings) }); alert('已保存'); }
         function toggleTheme() { const d = document.body.classList.toggle('dark'); document.getElementById('theme-toggle').classList.toggle('on', d); localStorage.setItem('theme', d ? 'dark' : 'light'); }
         function loadTheme() { const d = localStorage.getItem('theme') === 'dark'; document.body.classList.toggle('dark', d); document.getElementById('theme-toggle').classList.toggle('on', d); }
         function closeModal(id) { document.getElementById(id).classList.remove('show'); }

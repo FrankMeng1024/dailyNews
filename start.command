@@ -70,7 +70,7 @@ if [ -z "$TUNNEL_URL" ]; then
     if command -v npx &> /dev/null; then
         echo "      尝试 localtunnel..."
         rm -f /tmp/tunnel.log
-        npx localtunnel --port 8000 > /tmp/tunnel.log 2>&1 &
+        npx localtunnel --port 8000 --subdomain ainews > /tmp/tunnel.log 2>&1 &
         TUNNEL_PID=$!
 
         for i in {1..30}; do
@@ -92,6 +92,11 @@ fi
 
 if [ -n "$TUNNEL_URL" ]; then
     echo "      ✓ [$TUNNEL_TYPE] $TUNNEL_URL"
+    if [ "$TUNNEL_TYPE" = "localtunnel" ]; then
+        PUBLIC_IP=$(curl -s https://ipv4.icanhazip.com)
+        echo ""
+        echo "      ⚠️  首次访问需输入密码: $PUBLIC_IP"
+    fi
 else
     echo "      ✗ 所有隧道方案均失败"
     TUNNEL_PID=""

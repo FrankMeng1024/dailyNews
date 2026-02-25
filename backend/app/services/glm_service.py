@@ -41,7 +41,7 @@ class GLMService:
             "temperature": 0.7
         }
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=1800.0) as client:
             response = await client.post(
                 self.api_url,
                 headers=self._get_headers(),
@@ -137,6 +137,73 @@ Summary:"""
         except Exception as e:
             return content[:max_length] + "..." if len(content) > max_length else content
 
+    async def translate_title(self, title: str) -> str:
+        """
+        Translate English news title to Chinese
+
+        Args:
+            title: English news title
+
+        Returns:
+            Chinese translated title
+        """
+        prompt = f"""将以下英文新闻标题翻译成简洁的中文，保持新闻标题风格，不要添加额外内容：
+
+{title}
+
+只输出翻译结果，不要其他内容。"""
+
+        messages = [
+            {"role": "system", "content": "你是一位专业的新闻翻译。"},
+            {"role": "user", "content": prompt}
+        ]
+
+        try:
+            result = await self._call_api(messages, max_tokens=128)
+            return result.strip()
+        except Exception as e:
+            return title  # Return original on error
+
+    async def translate_titles_batch(self, titles: List[str]) -> List[str]:
+        """
+        Translate multiple English titles to Chinese in one API call
+
+        Args:
+            titles: List of English titles
+
+        Returns:
+            List of Chinese translated titles
+        """
+        if not titles:
+            return []
+
+        titles_text = "\n".join([f"{i+1}. {t}" for i, t in enumerate(titles)])
+
+        prompt = f"""将以下英文新闻标题翻译成简洁的中文，保持新闻标题风格。
+
+{titles_text}
+
+输出格式（JSON数组）：
+["翻译1", "翻译2", ...]
+
+只输出JSON数组，不要其他内容。"""
+
+        messages = [
+            {"role": "system", "content": "你是一位专业的新闻翻译。只输出JSON数组。"},
+            {"role": "user", "content": prompt}
+        ]
+
+        try:
+            response = await self._call_api(messages, max_tokens=1024)
+            response = response.strip()
+            if response.startswith("```"):
+                response = response.split("```")[1]
+                if response.startswith("json"):
+                    response = response[4:]
+            return json.loads(response)
+        except Exception as e:
+            return titles  # Return originals on error
+
     async def generate_dialogue_script(
         self,
         news_list: List[News],
@@ -207,17 +274,25 @@ Summary:"""
         try:
             # Retry logic for rate limiting
             max_retries = 3
+            response = None
+            last_error = None
+
             for attempt in range(max_retries):
                 try:
                     response = await self._call_api(messages, max_tokens=4096)
                     break
                 except Exception as e:
+                    last_error = e
                     if '429' in str(e) and attempt < max_retries - 1:
                         logger.warning(f"[Dialogue] Rate limited, waiting 5s before retry {attempt + 2}/{max_retries}")
                         import asyncio
                         await asyncio.sleep(5)
                     else:
-                        raise e
+                        raise Exception(f"GLM API调用失败: {str(e) or type(e).__name__}")
+
+            # Check if we got a response
+            if response is None:
+                raise Exception(f"GLM API调用失败，已重试{max_retries}次: {str(last_error) or '未知错误'}")
 
             # Clean response and parse JSON
             response = response.strip()
@@ -230,13 +305,15 @@ Summary:"""
             logger.info(f"[Dialogue] Generated {len(dialogue)} turns")
             return dialogue
 
+        except json.JSONDecodeError as e:
+            logger.error(f"[Dialogue] JSON parse error: {e}")
+            raise Exception(f"对话脚本解析失败: AI返回的格式不正确")
         except Exception as e:
             logger.error(f"[Dialogue] GLM error: {e}")
-            # Return minimal dialogue on error
-            return [
-                {"speaker": "小雅", "text": "今天我们来讨论一些AI新闻。" if language == "zh" else "Let's discuss some AI news today."},
-                {"speaker": "小明", "text": "好的，让我们开始吧。" if language == "zh" else "Sure, let's get started."}
-            ]
+            error_msg = str(e) or "未知错误"
+            if "对话脚本" in error_msg or "GLM" in error_msg:
+                raise  # Already has user-friendly message
+            raise Exception(f"对话脚本生成失败: {error_msg}")
 
     async def score_and_update_news(self, db: Session, news_list: List[News]) -> int:
         """
