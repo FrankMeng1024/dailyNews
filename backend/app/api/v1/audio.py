@@ -11,15 +11,197 @@ from app.models.user import User
 from app.models.audio import AudioRecording
 from app.schemas.audio import (
     AudioCreate, AudioResponse, AudioDetailResponse,
-    AudioListResponse, AudioStatusResponse
+    AudioListResponse, AudioStatusResponse, VoiceListResponse,
+    TranscriptResponse, TranscriptItem
 )
 from app.schemas.news import NewsResponse
 from app.services.audio_service import audio_service, get_audio_progress
-from app.services.tts_service import tts_service
+from app.services.tts_service import tts_service, TTSService
+from app.services.glm_tts_service import glm_tts_service, GLMTTSService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/audio", tags=["Audio"])
+
+
+@router.get("/voices", response_model=VoiceListResponse)
+async def get_voices():
+    """
+    Get available voice options for audio generation
+    """
+    options = TTSService.get_voice_options()
+    return VoiceListResponse(
+        female=options["female"],
+        male=options["male"]
+    )
+
+
+@router.get("/voices/glm")
+async def get_glm_voices():
+    """
+    Get available GLM-TTS voice options
+    """
+    return GLMTTSService.get_voice_options()
+
+
+@router.get("/tts-compare")
+async def compare_tts(
+    text: str = Query(default="大家好，欢迎收听今天的AI资讯播客，精彩内容马上开始。", description="要合成的文本"),
+    voice_type: str = Query(default="female", description="语音类型: female 或 male")
+):
+    """
+    对比 Edge TTS 和 GLM-TTS 的效果
+    返回两个引擎生成的音频供试听
+    """
+    # 选择对应的语音
+    if voice_type == "female":
+        edge_voice = "zh-CN-XiaoxiaoNeural"
+        glm_voice = "female-tianmei"
+    else:
+        edge_voice = "zh-CN-YunxiNeural"
+        glm_voice = "male-qinqie"
+
+    results = {}
+    errors = {}
+
+    # 生成 Edge TTS
+    try:
+        edge_audio = await tts_service.text_to_speech(text, voice=edge_voice)
+        results["edge_tts"] = edge_audio
+    except Exception as e:
+        logger.error(f"Edge TTS error: {e}")
+        errors["edge_tts"] = str(e)
+
+    # 生成 GLM TTS
+    try:
+        glm_audio = await glm_tts_service.text_to_speech(text, voice=glm_voice)
+        results["glm_tts"] = glm_audio
+    except Exception as e:
+        logger.error(f"GLM TTS error: {e}")
+        errors["glm_tts"] = str(e)
+
+    if not results:
+        raise HTTPException(status_code=500, detail=f"Both TTS failed: {errors}")
+
+    # 返回对比信息
+    return {
+        "text": text,
+        "voice_type": voice_type,
+        "edge_voice": edge_voice,
+        "glm_voice": glm_voice,
+        "available": list(results.keys()),
+        "errors": errors if errors else None
+    }
+
+
+@router.get("/tts-compare/edge")
+async def get_edge_tts_preview(
+    text: str = Query(default="大家好，欢迎收听今天的AI资讯播客，精彩内容马上开始。"),
+    voice_type: str = Query(default="female")
+):
+    """
+    获取 Edge TTS 试听音频
+    """
+    voice = "zh-CN-XiaoxiaoNeural" if voice_type == "female" else "zh-CN-YunxiNeural"
+    try:
+        audio_bytes = await tts_service.text_to_speech(text, voice=voice)
+        return StreamingResponse(
+            iter([audio_bytes]),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": "inline; filename=edge_preview.mp3"}
+        )
+    except Exception as e:
+        logger.error(f"Edge TTS preview error: {e}")
+        raise HTTPException(status_code=500, detail=f"Edge TTS failed: {str(e)}")
+
+
+@router.get("/tts-compare/glm")
+async def get_glm_tts_preview(
+    text: str = Query(default="大家好，欢迎收听今天的AI资讯播客，精彩内容马上开始。"),
+    voice_type: str = Query(default="female")
+):
+    """
+    获取 GLM TTS 试听音频
+    """
+    voice = "female-tianmei" if voice_type == "female" else "male-qinqie"
+    try:
+        audio_bytes = await glm_tts_service.text_to_speech(text, voice=voice)
+        return StreamingResponse(
+            iter([audio_bytes]),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": "inline; filename=glm_preview.mp3"}
+        )
+    except Exception as e:
+        logger.error(f"GLM TTS preview error: {e}")
+        raise HTTPException(status_code=500, detail=f"GLM TTS failed: {str(e)}")
+
+
+@router.get("/voices/preview/{voice_id}")
+async def preview_voice(voice_id: str):
+    """
+    Get a short audio preview for a voice (returns cached file)
+    """
+    # Validate voice exists
+    is_female = TTSService.is_valid_voice(voice_id, "female")
+    is_male = TTSService.is_valid_voice(voice_id, "male")
+
+    if not is_female and not is_male:
+        raise HTTPException(status_code=400, detail="Invalid voice ID")
+
+    # Check for cached preview
+    preview_path = tts_service.get_preview_path(voice_id)
+    if preview_path.exists():
+        return FileResponse(
+            path=str(preview_path),
+            media_type="audio/mpeg",
+            filename="preview.mp3"
+        )
+
+    # Fallback: generate on-the-fly if cache missing
+    if is_female:
+        preview_text = "大家好，欢迎收听今天的AI资讯播客。"
+    else:
+        preview_text = "没错，今天我们来聊聊最新的科技动态。"
+
+    try:
+        audio_bytes = await tts_service.text_to_speech(preview_text, voice=voice_id)
+        return StreamingResponse(
+            iter([audio_bytes]),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": f"inline; filename=preview.mp3"}
+        )
+    except Exception as e:
+        logger.error(f"Voice preview error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate preview")
+
+
+@router.get("/{audio_id}/transcript", response_model=TranscriptResponse)
+async def get_transcript(
+    audio_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get transcript/subtitles for an audio recording
+    """
+    audio = db.query(AudioRecording).filter(
+        AudioRecording.id == audio_id,
+        AudioRecording.user_id == current_user.id
+    ).first()
+
+    if not audio:
+        raise HTTPException(status_code=404, detail="Audio not found")
+
+    if audio.status != "completed":
+        raise HTTPException(status_code=400, detail="Audio not ready")
+
+    if not audio.transcript:
+        raise HTTPException(status_code=404, detail="Transcript not available")
+
+    return TranscriptResponse(
+        audio_id=audio_id,
+        transcript=[TranscriptItem(**item) for item in audio.transcript]
+    )
 
 
 @router.get("", response_model=AudioListResponse)
@@ -82,8 +264,19 @@ async def create_audio(
     if not request.news_ids:
         raise HTTPException(status_code=400, detail="No news articles selected")
 
-    if len(request.news_ids) > 10:
-        raise HTTPException(status_code=400, detail="Maximum 10 articles per audio")
+    if len(request.news_ids) > 20:
+        raise HTTPException(status_code=400, detail="Maximum 20 articles per audio")
+
+    # Validate voice IDs if provided
+    if request.voice_female and not TTSService.is_valid_voice(request.voice_female, "female"):
+        raise HTTPException(status_code=400, detail="Invalid female voice ID")
+    if request.voice_male and not TTSService.is_valid_voice(request.voice_male, "male"):
+        raise HTTPException(status_code=400, detail="Invalid male voice ID")
+
+    # Validate speed range (if provided, otherwise use default)
+    speed = getattr(request, 'speed', 1.15) or 1.15
+    if not 0.5 <= speed <= 2.0:
+        raise HTTPException(status_code=400, detail="Speed must be between 0.5 and 2.0")
 
     try:
         audio = await audio_service.create_audio(
@@ -91,7 +284,12 @@ async def create_audio(
             user_id=current_user.id,
             news_ids=request.news_ids,
             title=request.title,
-            language=request.language.value
+            language=request.language.value,
+            voice_female=request.voice_female,
+            voice_male=request.voice_male,
+            host_female_name=request.host_female_name,
+            host_male_name=request.host_male_name,
+            speed=speed
         )
         return AudioResponse.model_validate(audio)
 

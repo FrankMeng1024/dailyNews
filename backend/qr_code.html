@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>扫描访问</title>
+    <style>
+        body { font-family: Arial; text-align: center; padding: 50px; }
+        #qrcode { margin: 20px auto; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <h1>手机扫描访问</h1>
+    <div id="qrcode"></div>
+    <p id="url"></p>
+    <script>
+        const url = 'http://192.168.3.8:8000';
+        document.getElementById('url').textContent = url;
+        new QRCode(document.getElementById('qrcode'), {
+            text: url,
+            width: 256,
+            height: 256
+        });
+    </script>
+</body>
+</html>

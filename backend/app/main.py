@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import init_db
 from app.api.v1.router import api_router
 from app.services.scheduler_service import scheduler_service
+from app.services.tts_service import tts_service
 
 
 @asynccontextmanager
@@ -16,6 +17,9 @@ async def lifespan(app: FastAPI):
     # Startup
     init_db()
     scheduler_service.start()
+    # Pre-generate voice previews in background
+    import asyncio
+    asyncio.create_task(tts_service.generate_all_previews())
     yield
     # Shutdown
     scheduler_service.shutdown()

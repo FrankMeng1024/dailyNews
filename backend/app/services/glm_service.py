@@ -207,7 +207,9 @@ Summary:"""
     async def generate_dialogue_script(
         self,
         news_list: List[News],
-        language: str = "zh"
+        language: str = "zh",
+        host_female_name: Optional[str] = None,
+        host_male_name: Optional[str] = None
     ) -> List[Dict[str, str]]:
         """
         Generate a two-person dialogue script discussing the news
@@ -215,12 +217,18 @@ Summary:"""
         Args:
             news_list: List of news articles to discuss
             language: Output language (zh, en, bilingual)
+            host_female_name: Custom female host name (default: 小雅)
+            host_male_name: Custom male host name (default: 小明)
 
         Returns:
             List of dialogue turns with speaker and text
         """
         import logging
         logger = logging.getLogger(__name__)
+
+        # Use custom names or defaults
+        female_name = host_female_name or "小雅"
+        male_name = host_male_name or "小明"
 
         # Prepare news content - use refined content (news.content) with higher limit
         news_content = []
@@ -242,8 +250,8 @@ Summary:"""
         prompt = f"""你是一位专业的播客脚本作家。请根据以下新闻内容，创作一段两人对话讨论。
 
 主持人设定：
-- 小雅（女）：善于分析，提出有洞察力的问题
-- 小明（男）：善于解释，分享观点和见解
+- {female_name}（女）：善于分析，提出有洞察力的问题
+- {male_name}（男）：善于解释，分享观点和见解
 
 {lang_instruction}
 
@@ -252,15 +260,63 @@ Summary:"""
 
 要求：
 1. 开场简短介绍今天要讨论的话题
-2. 深入讨论每条新闻的核心内容、技术细节、行业影响
-3. 两人有来有往，自然对话，不要生硬
-4. 结尾总结要点，展望未来
-5. 对话时长约3-5分钟（约800-1200字）
+2. 必须逐一讨论每篇新闻，确保每篇文章的核心内容都讲清楚
+3. 每篇文章讨论时间根据内容复杂度灵活调整，简单的30秒，复杂的可以讨论3-5分钟
+4. 深入讨论技术细节、行业影响、未来展望
+5. 两人有来有往，自然对话，不要生硬
+6. 结尾总结要点
+7. 总共有{len(news_content)}篇文章，请确保每篇都有充分讨论
+
+【重要】文本格式规范（用于语音合成）：
+- 英文术语：保持原样如"GPT4"、"OpenAI"、"LLMs"，不要加空格或连字符
+- 专有名词：不要在中间加空格，如"哈利波特"而不是"哈利 波特"
+- 数字单位：紧贴不加空格，如"40%"、"100美元"、"2.5倍"
+- 日期：写"2024年3月15日"，不要写"2024-03-15"
+- 避免使用破折号（—）、省略号（...）等会造成停顿的符号
+- 中英混合时不要加空格，如"这个AI模型"而不是"这个 AI 模型"
+
+【对话风格要求】：
+1. 口语化表达：
+   - 使用口语化词汇，避免书面语
+   - 适当使用语气词："嗯"、"哦"、"哇"、"诶"、"对对对"、"没错"
+   - 使用停顿词："那个"、"就是说"、"其实"、"怎么说呢"
+   - 使用反问句增加互动："是吧？"、"对不对？"、"你觉得呢？"
+   - 示例：不要说"这项技术具有重要意义"，而说"这个技术真的挺重要的"
+
+2. 句式结构：
+   - 多用短句，避免超过30字的长句
+   - 一个观点分多句表达，增加停顿和呼吸感
+   - 两人对话要有来有往，不要一个人说太长
+   - 示例：不要说"这个模型在多个任务上都取得了突破性进展"，而说"这个模型表现真的很好。在好几个任务上，都有突破性的进展。"
+
+3. 情感表达：
+   - 对有趣的内容表现出兴奋："哇，这个太酷了！"、"真的假的？"
+   - 对复杂的内容表现出思考："嗯...这个确实挺复杂的"、"让我想想"
+   - 对争议性内容表现出谨慎："这个可能还有待观察"、"不过也有人持不同意见"
+   - 适当使用感叹句："太厉害了！"、"这也太快了吧！"
+
+4. 对话节奏：
+   - 开场要简短有力，不要冗长
+   - 讨论每条新闻时，先简单概括，再深入展开
+   - 两人要有真实的互动，不要像念稿子
+   - 适当插入"嗯嗯"、"对"、"是的"等回应
+   - 结尾要自然收尾，不要突然结束
+
+【对话示例】：
+错误示例（AI感重）：
+{female_name}：今天我们来讨论一下最新的人工智能技术发展。
+{male_name}：是的，这项技术在多个领域都取得了显著的进展。
+
+正确示例（自然口语）：
+{female_name}：诶，今天有个挺有意思的消息，关于AI的。
+{male_name}：哦？说来听听，什么消息？
+{female_name}：就是那个GPT4，又有新进展了。
+{male_name}：哇，这也太快了吧！具体是什么进展？
 
 输出格式（JSON数组）：
 [
-  {{"speaker": "小雅", "text": "..."}},
-  {{"speaker": "小明", "text": "..."}},
+  {{"speaker": "{female_name}", "text": "..."}},
+  {{"speaker": "{male_name}", "text": "..."}},
   ...
 ]
 
@@ -279,7 +335,7 @@ Summary:"""
 
             for attempt in range(max_retries):
                 try:
-                    response = await self._call_api(messages, max_tokens=4096)
+                    response = await self._call_api(messages, max_tokens=8192)
                     break
                 except Exception as e:
                     last_error = e

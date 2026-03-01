@@ -70,7 +70,12 @@ class AudioService:
         user_id: int,
         news_ids: List[int],
         title: Optional[str] = None,
-        language: str = "zh"
+        language: str = "zh",
+        voice_female: Optional[str] = None,
+        voice_male: Optional[str] = None,
+        host_female_name: Optional[str] = None,
+        host_male_name: Optional[str] = None,
+        speed: float = 1.15
     ) -> AudioRecording:
         """
         Create a new audio recording from selected news
@@ -81,6 +86,11 @@ class AudioService:
             news_ids: List of news IDs to include
             title: Optional custom title from user
             language: Audio language (zh, en, bilingual)
+            voice_female: Female voice ID
+            voice_male: Male voice ID
+            host_female_name: Custom female host name
+            host_male_name: Custom male host name
+            speed: Speech speed (0.5-2.0)
 
         Returns:
             Created AudioRecording object
@@ -123,7 +133,10 @@ class AudioService:
         db.commit()
 
         # Start background generation
-        asyncio.create_task(self._generate_audio_background(db, audio.id, news_list, language))
+        asyncio.create_task(self._generate_audio_background(
+            db, audio.id, news_list, language, voice_female, voice_male,
+            host_female_name, host_male_name, speed
+        ))
 
         return audio
 
@@ -132,7 +145,12 @@ class AudioService:
         db: Session,
         audio_id: int,
         news_list: List[News],
-        language: str
+        language: str,
+        voice_female: Optional[str] = None,
+        voice_male: Optional[str] = None,
+        host_female_name: Optional[str] = None,
+        host_male_name: Optional[str] = None,
+        speed: float = 1.15
     ):
         """
         Background task to generate audio with progress tracking
@@ -142,6 +160,11 @@ class AudioService:
             audio_id: Audio recording ID
             news_list: List of news articles
             language: Audio language
+            voice_female: Female voice ID
+            voice_male: Male voice ID
+            host_female_name: Custom female host name
+            host_male_name: Custom male host name
+            speed: Speech speed (0.5-2.0)
         """
         from app.database import SessionLocal
 
@@ -161,9 +184,13 @@ class AudioService:
             set_audio_progress(audio_id, 5, "准备新闻内容")
             logger.info(f"Audio {audio_id}: Starting dialogue generation")
 
-            # Generate dialogue script
+            # Generate dialogue script with custom host names
             set_audio_progress(audio_id, 10, "生成对话脚本")
-            dialogue = await glm_service.generate_dialogue_script(news_list, language)
+            dialogue = await glm_service.generate_dialogue_script(
+                news_list, language,
+                host_female_name=host_female_name,
+                host_male_name=host_male_name
+            )
 
             # Validate dialogue has enough turns
             if len(dialogue) < 5:
@@ -181,6 +208,9 @@ class AudioService:
             result = await tts_service.generate_dialogue_audio(
                 dialogue,
                 language=language,
+                voice_female=voice_female,
+                voice_male=voice_male,
+                speed=speed,
                 progress_callback=tts_progress_callback
             )
 
@@ -193,6 +223,7 @@ class AudioService:
             audio.file_path = result["file_path"]
             audio.file_size = result["file_size"]
             audio.duration = result["duration"]
+            audio.transcript = result.get("transcript")
             audio.status = "completed"
             db.commit()
 

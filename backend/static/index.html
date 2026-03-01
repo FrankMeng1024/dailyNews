@@ -16,6 +16,16 @@
             --primary-end: #764ba2;
             --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
             --border: #e5e5ea;
+            /* Responsive spacing */
+            --spacing-xs: clamp(6px, 1.5vw, 8px);
+            --spacing-sm: clamp(8px, 2vw, 12px);
+            --spacing-md: clamp(12px, 3vw, 16px);
+            --spacing-lg: clamp(16px, 4vw, 24px);
+            /* Responsive fonts */
+            --font-xs: clamp(10px, 2.5vw, 12px);
+            --font-sm: clamp(12px, 3vw, 14px);
+            --font-md: clamp(14px, 3.5vw, 16px);
+            --font-lg: clamp(18px, 4.5vw, 22px);
         }
         .dark {
             --bg: #0d0d0d;
@@ -50,7 +60,7 @@
 
         /* Progress bar */
         .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--primary-gradient); z-index: 999; transition: width 0.3s; }
-        .progress-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); padding: 24px 32px; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); z-index: 998; display: none; min-width: 280px; border: 1px solid var(--border); }
+        .progress-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); padding: var(--spacing-lg) var(--spacing-lg); border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); z-index: 998; display: none; min-width: min(90vw, 280px); border: 1px solid var(--border); }
         .dark .progress-text { background: var(--card-gradient); }
         .progress-text.show { display: block; }
         .progress-inner { height: 6px; background: var(--border); border-radius: 3px; margin-top: 12px; overflow: hidden; }
@@ -88,9 +98,25 @@
         .detail-tab { flex: 1; padding: 12px; text-align: center; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s; }
         .detail-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
         .detail-tab:hover { color: var(--primary); }
-        .original-title-box { background: rgba(102,126,234,0.1); padding: 12px 16px; border-radius: 14px; margin-bottom: 16px; border-left: 3px solid var(--primary); }
-        .original-title-label { font-size: 11px; color: var(--primary); margin-bottom: 4px; font-weight: 500; }
-        .original-title-text { font-size: 14px; color: var(--text2); line-height: 1.5; }
+        .original-title-box { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+        .original-title-label { display: none; }
+        .original-title-text { font-size: 15px; color: var(--text); line-height: 1.5; word-break: break-word; font-weight: 600; }
+        .original-content { font-size: 15px; color: var(--text); line-height: 1.7; }
+
+        /* Modal Overlay */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .download-option { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; margin-bottom: 10px; transition: background 0.2s, border-color 0.2s; }
+        .download-option:hover { background: rgba(102,126,234,0.1); border-color: var(--primary); }
+
+        /* Transcript Styles */
+        .transcript-header { margin-bottom: 20px; }
+        .transcript-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+        .transcript-meta { font-size: 13px; color: var(--text2); }
+        .transcript-item { background: var(--card); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+        .transcript-speaker { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .transcript-speaker-name { font-size: 14px; font-weight: 600; color: var(--primary); }
+        .transcript-speaker-time { font-size: 12px; color: var(--text2); }
+        .transcript-text { font-size: 14px; color: var(--text); line-height: 1.6; }
         
         /* Spotify-style Audio Page - Theme Adaptive */
         .audio-page-content { background: var(--bg); min-height: calc(100vh - 140px); }
@@ -142,12 +168,16 @@
         .fab:hover { transform: scale(1.05); box-shadow: 0 8px 28px rgba(102,126,234,0.5); }
 
         /* Spotify-style Player - Theme Adaptive */
-        .player { position: fixed; left: 0; right: 0; bottom: 60px; height: 76px; background: var(--card); border-top: 1px solid var(--border); display: none; z-index: 90; padding: 0 16px; }
+        .player { position: fixed; left: 0; right: 0; bottom: 60px; background: var(--card); border-top: 1px solid var(--border); display: none; z-index: 90; padding: 0 16px; flex-direction: column; }
         .dark .player { background: linear-gradient(180deg, #1c1c2e 0%, #16162a 100%); border-top: 1px solid #2a2a3e; }
-        .player.show { display: flex; align-items: center; gap: 12px; }
+        .player.show { display: flex; }
         .np-progress { position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--border); cursor: pointer; }
         .np-progress-fill { height: 100%; background: var(--primary-gradient); position: relative; transition: width 0.1s; }
         .np-progress:hover .np-progress-fill { filter: brightness(1.1); }
+        .subtitle-bar { padding: 8px 12px; font-size: 13px; text-align: center; background: rgba(102,126,234,0.1); border-radius: 8px; margin: 8px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .subtitle-speaker { color: var(--primary); font-weight: 600; margin-right: 6px; }
+        .subtitle-text { color: var(--text); }
+        .player-main { display: flex; align-items: center; gap: 12px; padding: 8px 0 12px; }
         .np-cover { width: 56px; height: 56px; border-radius: 12px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
         .np-info { flex: 1; min-width: 0; }
         .np-title { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -170,7 +200,15 @@
         .toggle.on { background: var(--primary-gradient); }
         .toggle::after { content: ''; position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .toggle.on::after { left: 24px; }
-        .hours-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+        .hours-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: var(--spacing-sm); margin-top: 14px; }
+        /* Responsive voice selector */
+        .voice-selector { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
+        .voice-selector > div { flex: 1; min-width: 140px; }
+        .voice-selector select { min-width: 0; }
+        @media (max-width: 400px) {
+            .voice-selector { flex-direction: column; }
+            .voice-selector > div { min-width: 100%; }
+        }
         .hour-btn { padding: 12px; text-align: center; background: var(--bg); border-radius: 12px; font-size: 13px; cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.15s; }
         .hour-btn:hover { background: rgba(102,126,234,0.1); }
         .hour-btn:active { transform: scale(0.95); }
@@ -293,6 +331,46 @@
                 <label style="font-size:14px;color:var(--text2);display:block;margin-bottom:6px">音频标题 (可选)</label>
                 <input type="text" id="audio-title-input" placeholder="留空则自动生成" style="width:100%;padding:14px 16px;border:1px solid var(--border);border-radius:14px;font-size:15px;background:var(--card);color:var(--text);outline:none;transition:border-color 0.2s;">
             </div>
+            <!-- Compact voice selector -->
+            <div style="display:flex;gap:12px;margin-bottom:16px">
+                <div style="flex:1">
+                    <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">👩 女声</label>
+                    <div style="display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card)">
+                        <select id="voice-female-select" style="flex:1;padding:10px 8px;border:none;font-size:13px;background:transparent;color:var(--text);outline:none;min-width:0"></select>
+                        <button onclick="previewVoice('female')" style="width:36px;border:none;border-left:1px solid var(--border);background:transparent;color:var(--primary);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="试听">▶</button>
+                    </div>
+                </div>
+                <div style="flex:1">
+                    <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">👨 男声</label>
+                    <div style="display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card)">
+                        <select id="voice-male-select" style="flex:1;padding:10px 8px;border:none;font-size:13px;background:transparent;color:var(--text);outline:none;min-width:0"></select>
+                        <button onclick="previewVoice('male')" style="width:36px;border:none;border-left:1px solid var(--border);background:transparent;color:var(--primary);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="试听">▶</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Advanced settings (collapsible) -->
+            <div style="margin-bottom:16px">
+                <div onclick="toggleAdvancedSettings()" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 0;color:var(--text2);font-size:14px">
+                    <span id="advanced-arrow" style="transition:transform 0.2s">▶</span>
+                    <span>高级设置</span>
+                </div>
+                <div id="advanced-settings" style="display:none;padding:12px;background:var(--bg);border-radius:12px;margin-top:8px">
+                    <div style="margin-bottom:12px">
+                        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">女声名字</label>
+                        <input type="text" id="host-female-name" placeholder="小雅" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--card);color:var(--text);outline:none">
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">男声名字</label>
+                        <input type="text" id="host-male-name" placeholder="小明" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--card);color:var(--text);outline:none">
+                    </div>
+                    <div style="font-size:11px;color:var(--text2);margin-bottom:12px">留空使用默认名字</div>
+                    <!-- TTS对比试听 -->
+                    <div style="padding-top:12px;border-top:1px solid var(--border)">
+                        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">语音引擎对比</div>
+                        <button onclick="showTTSCompare()" style="width:100%;padding:10px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:10px;font-size:13px;cursor:pointer">🎧 对比试听 Edge TTS vs GLM-TTS</button>
+                    </div>
+                </div>
+            </div>
             <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
                 <span style="font-size:14px;color:var(--text2)">选择新闻</span>
                 <div>
@@ -305,19 +383,105 @@
         </div>
     </div>
 
+    <!-- Transcript Viewer Modal -->
+    <div id="transcript-modal" class="detail-page">
+        <div class="detail-header">
+            <button class="back-btn" onclick="closeModal('transcript-modal')">←</button>
+            <span class="detail-header-title">对话文案</span>
+            <button class="header-action-btn" onclick="showDownloadOptions()" style="background:none;border:none;color:var(--primary);font-size:14px;cursor:pointer;padding:8px 12px;">下载</button>
+        </div>
+        <div class="detail-content" id="transcript-content">
+            <!-- Content will be populated by JS -->
+        </div>
+    </div>
+
+    <!-- Download Options Modal -->
+    <div id="download-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content" style="background:var(--card);border-radius:20px;padding:20px;margin:20px;max-width:320px;">
+            <div style="font-size:16px;font-weight:600;text-align:center;margin-bottom:16px;color:var(--text)">选择下载格式</div>
+            <div class="download-options">
+                <div class="download-option" onclick="downloadTranscript('txt')">
+                    <span style="font-size:24px">📄</span>
+                    <div>
+                        <div style="font-weight:500;color:var(--text)">纯文本 (.txt)</div>
+                        <div style="font-size:12px;color:var(--text2)">简洁格式，方便复制</div>
+                    </div>
+                </div>
+                <div class="download-option" onclick="downloadTranscript('srt')">
+                    <span style="font-size:24px">📋</span>
+                    <div>
+                        <div style="font-weight:500;color:var(--text)">SRT字幕 (.srt)</div>
+                        <div style="font-size:12px;color:var(--text2)">带时间戳，可导入视频</div>
+                    </div>
+                </div>
+                <div class="download-option" onclick="downloadTranscript('json')">
+                    <span style="font-size:24px">📊</span>
+                    <div>
+                        <div style="font-weight:500;color:var(--text)">JSON格式 (.json)</div>
+                        <div style="font-size:12px;color:var(--text2)">完整数据，方便二次处理</div>
+                    </div>
+                </div>
+            </div>
+            <button onclick="closeModal('download-modal')" style="width:100%;margin-top:16px;padding:12px;border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:12px;font-size:14px;cursor:pointer">取消</button>
+        </div>
+    </div>
+
+    <!-- TTS Compare Modal -->
+    <div id="tts-compare-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content" style="background:var(--card);border-radius:20px;padding:20px;margin:20px;max-width:360px;">
+            <div style="font-size:16px;font-weight:600;text-align:center;margin-bottom:16px;color:var(--text)">🎧 语音引擎对比</div>
+            <div style="margin-bottom:16px">
+                <div style="font-size:12px;color:var(--text2);margin-bottom:8px">选择性别</div>
+                <div style="display:flex;gap:8px">
+                    <button id="tts-compare-female" onclick="setTTSCompareGender('female')" style="flex:1;padding:10px;border:2px solid var(--primary);background:rgba(102,126,234,0.1);color:var(--primary);border-radius:10px;font-size:13px;cursor:pointer">👩 女声</button>
+                    <button id="tts-compare-male" onclick="setTTSCompareGender('male')" style="flex:1;padding:10px;border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:10px;font-size:13px;cursor:pointer">👨 男声</button>
+                </div>
+            </div>
+            <div style="margin-bottom:16px">
+                <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Edge TTS (当前使用)</div>
+                <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:12px">
+                    <button id="edge-play-btn" onclick="playTTSCompare('edge')" style="width:40px;height:40px;border-radius:50%;background:var(--primary-gradient);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
+                    <div style="flex:1">
+                        <div style="font-size:14px;color:var(--text)">微软 Edge TTS</div>
+                        <div style="font-size:11px;color:var(--text2)">免费、稳定、多语音</div>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-bottom:16px">
+                <div style="font-size:12px;color:var(--text2);margin-bottom:8px">GLM TTS (智谱)</div>
+                <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:12px">
+                    <button id="glm-play-btn" onclick="playTTSCompare('glm')" style="width:40px;height:40px;border-radius:50%;background:var(--primary-gradient);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
+                    <div style="flex:1">
+                        <div style="font-size:14px;color:var(--text)">智谱 GLM-TTS</div>
+                        <div style="font-size:11px;color:var(--text2)">超拟人、情感丰富</div>
+                    </div>
+                </div>
+            </div>
+            <div id="tts-compare-status" style="font-size:12px;color:var(--text2);text-align:center;margin-bottom:12px;display:none"></div>
+            <button onclick="closeTTSCompare()" style="width:100%;padding:12px;border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:12px;font-size:14px;cursor:pointer">关闭</button>
+        </div>
+    </div>
+
     <!-- Audio Player (Spotify Style) -->
     <div id="player" class="player">
         <div class="np-progress" onclick="seekToPosition(event)">
             <div id="np-progress-fill" class="np-progress-fill" style="width:0%"></div>
         </div>
-        <div class="np-info" style="flex:1;min-width:0;margin-left:12px">
-            <div id="player-title" class="np-title">-</div>
-            <div id="player-time" class="np-artist">0:00</div>
+        <div id="subtitle-bar" class="subtitle-bar" style="display:none">
+            <span id="subtitle-speaker" class="subtitle-speaker"></span>
+            <span id="subtitle-text"></span>
         </div>
-        <div class="np-controls">
-            <span class="np-btn seek-btn" onclick="seekAudio(-15)">-15</span>
-            <span id="play-btn" class="np-btn main" onclick="togglePlay()">▶</span>
-            <span class="np-btn seek-btn" onclick="seekAudio(15)">+15</span>
+        <div class="player-main">
+            <div class="np-info" style="flex:1;min-width:0">
+                <div id="player-title" class="np-title">-</div>
+                <div id="player-time" class="np-artist">0:00</div>
+            </div>
+            <div class="np-controls">
+                <span class="np-btn seek-btn" onclick="seekAudio(-15)">-15</span>
+                <span id="play-btn" class="np-btn main" onclick="togglePlay()">▶</span>
+                <span class="np-btn seek-btn" onclick="seekAudio(15)">+15</span>
+                <span id="speed-btn" class="np-btn seek-btn" onclick="cycleSpeed()">1x</span>
+            </div>
         </div>
     </div>
 
@@ -328,12 +492,22 @@
             return false;
         };
 
+        // Catch unhandled promise rejections
+        window.onunhandledrejection = function(event) {
+            document.body.innerHTML = '<div style="padding:20px;color:red;font-size:14px;"><h3>Promise Error</h3><p>' + event.reason + '</p></div>';
+        };
+
         const API = '';
         let token = localStorage.getItem('token');
         let currentNews = [];
         let selectedNews = [];
         let settings = { fetch_hours: ['8','12','18'] };
         let audio = null;
+        let voiceOptions = { female: [], male: [] };
+
+        // Playback speed control
+        const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+        let currentSpeedIndex = 1; // Default 1x
 
         // Debug helper
         function log(msg) {
@@ -343,12 +517,15 @@
         async function init() {
             log('Init started');
             try {
-                if (!token) {
-                    log('No token, logging in...');
-                    await login();
-                }
+                // Always clear old token and re-login to ensure fresh session
+                log('Clearing old token and logging in...');
+                localStorage.removeItem('token');
+                token = null;
+                await login();
+
                 log('Token ready, loading data...');
                 loadTheme();
+                await loadVoices();
                 await loadNews();
                 await loadAudio();
                 await loadSettings();
@@ -360,27 +537,190 @@
             }
         }
 
+        async function loadVoices() {
+            try {
+                const data = await api('/api/v1/audio/voices');
+                voiceOptions = data;
+                log('Voices loaded: ' + data.female.length + ' female, ' + data.male.length + ' male');
+            } catch (e) {
+                console.error('Load voices error:', e);
+            }
+        }
+
+        let previewAudio = null;
+        function previewVoice(gender) {
+            const select = document.getElementById('voice-' + gender + '-select');
+            const voiceId = select.value;
+            if (!voiceId) return;
+
+            // Stop any playing preview
+            if (previewAudio) {
+                previewAudio.pause();
+                previewAudio = null;
+            }
+
+            showToast('加载试听...');
+            previewAudio = new Audio(API + '/api/v1/audio/voices/preview/' + encodeURIComponent(voiceId));
+            previewAudio.play().catch(e => {
+                console.error('Preview error:', e);
+                showToast('试听失败');
+            });
+        }
+
+        // TTS Compare functions
+        let ttsCompareGender = 'female';
+        let ttsCompareAudio = null;
+
+        function showTTSCompare() {
+            document.getElementById('tts-compare-modal').style.display = 'flex';
+            setTTSCompareGender('female');
+        }
+
+        function closeTTSCompare() {
+            document.getElementById('tts-compare-modal').style.display = 'none';
+            if (ttsCompareAudio) {
+                ttsCompareAudio.pause();
+                ttsCompareAudio = null;
+            }
+            // Reset button states
+            document.getElementById('edge-play-btn').innerHTML = '▶';
+            document.getElementById('glm-play-btn').innerHTML = '▶';
+        }
+
+        function setTTSCompareGender(gender) {
+            ttsCompareGender = gender;
+            // Update button styles
+            const femaleBtn = document.getElementById('tts-compare-female');
+            const maleBtn = document.getElementById('tts-compare-male');
+            if (gender === 'female') {
+                femaleBtn.style.border = '2px solid var(--primary)';
+                femaleBtn.style.background = 'rgba(102,126,234,0.1)';
+                femaleBtn.style.color = 'var(--primary)';
+                maleBtn.style.border = '1px solid var(--border)';
+                maleBtn.style.background = 'transparent';
+                maleBtn.style.color = 'var(--text2)';
+            } else {
+                maleBtn.style.border = '2px solid var(--primary)';
+                maleBtn.style.background = 'rgba(102,126,234,0.1)';
+                maleBtn.style.color = 'var(--primary)';
+                femaleBtn.style.border = '1px solid var(--border)';
+                femaleBtn.style.background = 'transparent';
+                femaleBtn.style.color = 'var(--text2)';
+            }
+            // Stop current audio
+            if (ttsCompareAudio) {
+                ttsCompareAudio.pause();
+                ttsCompareAudio = null;
+            }
+            document.getElementById('edge-play-btn').innerHTML = '▶';
+            document.getElementById('glm-play-btn').innerHTML = '▶';
+        }
+
+        function playTTSCompare(engine) {
+            // Stop current audio
+            if (ttsCompareAudio) {
+                ttsCompareAudio.pause();
+                ttsCompareAudio = null;
+            }
+            // Reset all buttons
+            document.getElementById('edge-play-btn').innerHTML = '▶';
+            document.getElementById('glm-play-btn').innerHTML = '▶';
+
+            const statusEl = document.getElementById('tts-compare-status');
+            statusEl.style.display = 'block';
+            statusEl.textContent = '加载中...';
+
+            const url = API + '/api/v1/audio/tts-compare/' + engine + '?voice_type=' + ttsCompareGender;
+            ttsCompareAudio = new Audio(url);
+
+            const playBtn = document.getElementById(engine + '-play-btn');
+            playBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px"></span>';
+
+            ttsCompareAudio.oncanplay = () => {
+                statusEl.textContent = '播放中...';
+                playBtn.innerHTML = '⏸';
+            };
+
+            ttsCompareAudio.onended = () => {
+                playBtn.innerHTML = '▶';
+                statusEl.style.display = 'none';
+            };
+
+            ttsCompareAudio.onerror = (e) => {
+                console.error('TTS compare error:', e);
+                statusEl.textContent = engine === 'glm' ? 'GLM-TTS 加载失败，请检查API配置' : 'Edge TTS 加载失败';
+                playBtn.innerHTML = '▶';
+            };
+
+            ttsCompareAudio.play().catch(e => {
+                console.error('Play error:', e);
+                statusEl.textContent = '播放失败';
+                playBtn.innerHTML = '▶';
+            });
+        }
+
         async function login() {
             try {
                 log('Calling login API...');
                 const res = await fetch(API + '/api/v1/auth/dev-login', { method: 'POST' });
+                log('Login response status: ' + res.status);
+
+                if (!res.ok) {
+                    throw new Error('Login failed: HTTP ' + res.status);
+                }
+
                 const data = await res.json();
+                log('Login response data: ' + JSON.stringify(data));
+
+                if (!data.access_token) {
+                    throw new Error('No access token in response');
+                }
+
                 token = data.access_token;
                 localStorage.setItem('token', token);
-                log('Login success');
+                log('Login success, token: ' + token.substring(0, 20) + '...');
             } catch (e) {
                 console.error('Login error:', e);
+                log('Login failed: ' + e.message);
                 throw e;
             }
         }
 
         function api(url, options = {}) {
-            log('API call: ' + url);
-            return fetch(API + url, {
+            const fullUrl = API + url;
+            log('API call: ' + fullUrl);
+            return fetch(fullUrl, {
                 ...options,
                 headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...options.headers }
-            }).then(r => r.json()).catch(e => {
+            }).then(async r => {
+                log('API response status: ' + r.status + ' for ' + url);
+                if (r.status === 401) {
+                    // Token expired or invalid, try to re-login
+                    log('401 Unauthorized, attempting re-login...');
+                    try {
+                        await login();
+                        // Retry the request with new token
+                        log('Re-login successful, retrying request...');
+                        return fetch(fullUrl, {
+                            ...options,
+                            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...options.headers }
+                        }).then(r2 => {
+                            if (!r2.ok) {
+                                throw new Error('HTTP ' + r2.status + ': ' + r2.statusText);
+                            }
+                            return r2.json();
+                        });
+                    } catch (e) {
+                        throw new Error('Re-login failed: ' + e.message);
+                    }
+                }
+                if (!r.ok) {
+                    throw new Error('HTTP ' + r.status + ': ' + r.statusText);
+                }
+                return r.json();
+            }).catch(e => {
                 console.error('API error:', url, e);
+                log('API error: ' + url + ' - ' + e.message);
                 return { items: [], error: e.message };
             });
         }
@@ -513,7 +853,7 @@
         function showDetail(i) {
             const n = currentNews[i];
             window.currentDetailNews = n;
-            document.getElementById('detail-header-title').textContent = n.source_name;
+            document.getElementById('detail-header-title').textContent = '';
 
             // Get content
             let refined = n.content || '';
@@ -545,20 +885,21 @@
                         <div class="detail-tab" onclick="switchTab('refined')">精炼</div>
                         ${n.source_url ? `<div class="detail-tab" onclick="switchTab('link')">阅读原文</div>` : ''}
                     </div>
-                    ${hasEnglishTitle ? `
-                    <div class="original-title-box">
-                        <div class="original-title-label">📌 英文原标题</div>
-                        <div class="original-title-text">${n.title}</div>
-                    </div>` : ''}
-                    <div id="detail-text" class="detail-text">${original || '暂无原文内容'}</div>
+                    <div id="detail-text" class="detail-text">
+                        <div class="original-title-box">
+                            <div class="original-title-label">📰 原文标题</div>
+                            <div class="original-title-text">${n.title}</div>
+                        </div>
+                        <div class="original-content">${cleanText(original) || '暂无原文内容'}</div>
+                    </div>
                     <div id="detail-link-panel" style="display:none">
                         <div style="padding:14px;background:rgba(102,126,234,0.1);border-radius:14px;border:1px solid rgba(102,126,234,0.2);">
                             <div style="font-size:12px;color:var(--text2);margin-bottom:8px">🔗 原文链接</div>
                             <div style="font-size:13px;word-break:break-all;color:var(--primary);line-height:1.5;margin-bottom:12px">${n.source_url || ''}</div>
-                            <div style="display:flex;gap:10px">
-                                <button onclick="copyLink(window.detailContent.url)" style="flex:1;padding:10px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:10px;font-size:13px;cursor:pointer">复制链接</button>
-                                <button onclick="window.open(window.detailContent.url, '_blank')" style="flex:1;padding:10px;border:none;background:var(--primary-gradient);color:#fff;border-radius:10px;font-size:13px;cursor:pointer">打开链接</button>
-                                <button onclick="shareLink(window.detailContent.url)" style="flex:1;padding:10px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:10px;font-size:13px;cursor:pointer">分享</button>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                <button onclick="copyLink(window.detailContent.url)" style="flex:1;min-width:80px;padding:10px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:10px;font-size:var(--font-sm);cursor:pointer">复制</button>
+                                <button onclick="window.open(window.detailContent.url, '_blank')" style="flex:1;min-width:80px;padding:10px;border:none;background:var(--primary-gradient);color:#fff;border-radius:10px;font-size:var(--font-sm);cursor:pointer">打开</button>
+                                <button onclick="shareLink(window.detailContent.url)" style="flex:1;min-width:80px;padding:10px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:10px;font-size:var(--font-sm);cursor:pointer">分享</button>
                             </div>
                         </div>
                     </div>
@@ -583,8 +924,20 @@
             } else {
                 textEl.style.display = 'block';
                 linkEl.style.display = 'none';
-                const content = type === 'refined' ? window.detailContent.refined : window.detailContent.original;
-                textEl.textContent = content || (type === 'refined' ? '精炼生成中...' : '暂无原文内容');
+                const n = window.currentDetailNews;
+                if (type === 'original') {
+                    const cleanContent = cleanText(window.detailContent.original || '暂无原文内容');
+                    textEl.innerHTML = `
+                        <div class="original-title-box">
+                            <div class="original-title-label">📰 原文标题</div>
+                            <div class="original-title-text">${n.title}</div>
+                        </div>
+                        <div class="original-content">${cleanContent}</div>
+                    `;
+                } else {
+                    const cleanContent = cleanText(window.detailContent.refined || '精炼生成中...');
+                    textEl.innerHTML = `<div class="original-content">${cleanContent}</div>`;
+                }
             }
         }
 
@@ -609,6 +962,14 @@
             let url = `/api/v1/audio?sort_by=${sortBy}&sort_order=${sortOrder}`;
 
             const data = await api(url);
+
+            // Check for API errors
+            if (data.error) {
+                console.error('Load audio error:', data.error);
+                document.getElementById('audio-list').innerHTML = '<div class="audio-empty"><div class="audio-empty-icon">⚠️</div><div>加载失败</div><div style="margin-top:8px;font-size:13px;color:#ef4444">' + data.error + '</div></div>';
+                return;
+            }
+
             const list = data.items || [];
             window.audioList = list;
 
@@ -660,6 +1021,7 @@
                         </div>
                         <span class="audio-duration">${a.status === 'failed' ? '<span style="color:#ef4444">失败</span>' : formatDuration(a.duration)}</span>
                         <div class="audio-actions">
+                            <span class="action-btn" onclick="event.stopPropagation();viewTranscript(${a.id})" title="查看文案">📄</span>
                             <span class="action-btn" onclick="event.stopPropagation();confirmDelete(${a.id})">🗑️</span>
                         </div>
                     </div>`;
@@ -675,6 +1037,9 @@
         }
 
         async function pollAudioProgress(audioId) {
+            // Keep screen awake during audio generation
+            await requestWakeLock();
+
             try {
                 const status = await api(`/api/v1/audio/${audioId}/status`);
                 const progressEl = document.getElementById(`progress-${audioId}`);
@@ -684,6 +1049,7 @@
                 if (statusEl) statusEl.textContent = status.message || '处理中...';
 
                 if (status.status === 'completed' || status.status === 'failed') {
+                    releaseWakeLock();
                     loadAudio();
                 } else {
                     setTimeout(() => pollAudioProgress(audioId), 2000);
@@ -693,6 +1059,8 @@
                 setTimeout(() => pollAudioProgress(audioId), 3000);
             }
         }
+
+        let currentTranscript = [];
 
         function playAudio(audioId) {
             const a = window.audioList.find(x => x.id === audioId);
@@ -707,18 +1075,28 @@
             }
             if (audio) audio.pause();
             window.currentPlayingId = audioId;
+            currentTranscript = [];
+            window.lastSubtitle = null;
             audio = new Audio(API + '/api/v1/audio/' + a.id + '/stream?token=' + token);
+            audio.playbackRate = SPEEDS[currentSpeedIndex]; // Apply current speed
             audio.play();
             document.getElementById('player-title').textContent = a.title;
             document.getElementById('player').classList.add('show');
             document.getElementById('play-btn').innerHTML = '⏸';
+
+            // Load transcript for subtitles
+            loadTranscript(audioId);
+
             audio.ontimeupdate = () => {
                 document.getElementById('player-time').textContent = formatDuration(audio.currentTime) + ' / ' + formatDuration(audio.duration || 0);
                 const percent = audio.duration ? (audio.currentTime / audio.duration * 100) : 0;
                 document.getElementById('np-progress-fill').style.width = percent + '%';
+                // Update subtitle
+                updateSubtitle(audio.currentTime);
             };
             audio.onended = () => {
                 document.getElementById('play-btn').innerHTML = '▶';
+                hideSubtitle();
                 // Auto play next
                 const idx = window.audioList.findIndex(x => x.id === audioId);
                 if (idx >= 0 && idx + 1 < window.audioList.length) {
@@ -734,6 +1112,64 @@
             });
         }
 
+        async function loadTranscript(audioId) {
+            try {
+                const data = await api(`/api/v1/audio/${audioId}/transcript`);
+                if (data.transcript) {
+                    currentTranscript = data.transcript;
+                    document.getElementById('subtitle-bar').style.display = 'block';
+                }
+            } catch (e) {
+                console.log('No transcript available');
+                currentTranscript = [];
+            }
+        }
+
+        function updateSubtitle(currentTime) {
+            if (!currentTranscript.length) return;
+
+            // Find the segment that contains the current time
+            let current = null;
+            for (let i = 0; i < currentTranscript.length; i++) {
+                const t = currentTranscript[i];
+                // Check if currentTime is within this segment's time range
+                if (currentTime >= t.start && currentTime < t.end) {
+                    current = t;
+                    break;
+                }
+            }
+
+            // If no exact match, find the most recent segment
+            if (!current) {
+                for (let i = currentTranscript.length - 1; i >= 0; i--) {
+                    const t = currentTranscript[i];
+                    if (currentTime >= t.start) {
+                        current = t;
+                        break;
+                    }
+                }
+            }
+
+            if (current) {
+                const subtitleBar = document.getElementById('subtitle-bar');
+                const speakerEl = document.getElementById('subtitle-speaker');
+                const textEl = document.getElementById('subtitle-text');
+
+                // Always update if content changed
+                if (speakerEl.textContent !== current.speaker + ':' || textEl.textContent !== current.text) {
+                    speakerEl.textContent = current.speaker + ':';
+                    textEl.textContent = current.text;
+                }
+                subtitleBar.style.display = 'block';
+            }
+        }
+
+        function hideSubtitle() {
+            document.getElementById('subtitle-bar').style.display = 'none';
+            currentTranscript = [];
+            window.lastSubtitle = null;
+        }
+
         function playAllAudio() {
             const first = window.audioList && window.audioList.find(a => a.status === 'completed');
             if (first) playAudio(first.id);
@@ -746,9 +1182,32 @@
             audio.currentTime = percent * audio.duration;
         }
 
+        function toggleAdvancedSettings() {
+            const settings = document.getElementById('advanced-settings');
+            const arrow = document.getElementById('advanced-arrow');
+            const isHidden = settings.style.display === 'none';
+            settings.style.display = isHidden ? 'block' : 'none';
+            arrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+        }
+
         function showNewsSelector() {
             selectedNews = [];
             document.getElementById('audio-title-input').value = '';
+            // Reset advanced settings
+            document.getElementById('advanced-settings').style.display = 'none';
+            document.getElementById('advanced-arrow').style.transform = 'rotate(0deg)';
+            document.getElementById('host-female-name').value = '';
+            document.getElementById('host-male-name').value = '';
+
+            // Populate voice selects
+            const femaleSelect = document.getElementById('voice-female-select');
+            const maleSelect = document.getElementById('voice-male-select');
+            femaleSelect.innerHTML = voiceOptions.female.map((v, i) =>
+                `<option value="${v.id}" ${i === 0 ? 'selected' : ''}>${v.name} - ${v.desc}</option>`
+            ).join('');
+            maleSelect.innerHTML = voiceOptions.male.map((v, i) =>
+                `<option value="${v.id}" ${i === 0 ? 'selected' : ''}>${v.name} - ${v.desc}</option>`
+            ).join('');
 
             // Filter news: only show ready ones as selectable, others as disabled
             const readyNews = currentNews.filter(n => n.content_status === 'ready');
@@ -773,7 +1232,9 @@
             });
 
             document.getElementById('selector-list').innerHTML = html;
-            document.getElementById('selector-modal').classList.add('show');
+            const modal = document.getElementById('selector-modal');
+            modal.style.display = '';
+            modal.classList.add('show');
         }
 
         function toggleSelect(i) {
@@ -804,25 +1265,20 @@
             if (selectedNews.length === readyIds.length && readyIds.every(id => selectedNews.includes(id))) {
                 // Deselect all
                 selectedNews = [];
-                currentNews.forEach((n, i) => {
-                    const el = document.getElementById('check-' + i);
-                    if (el && !el.classList.contains('disabled')) {
-                        el.classList.remove('checked');
-                        el.textContent = '';
-                    }
-                });
             } else {
                 // Select first 20 ready news
                 selectedNews = [...readyIds];
-                currentNews.forEach((n, i) => {
-                    const el = document.getElementById('check-' + i);
-                    if (el && !el.classList.contains('disabled')) {
-                        const isSelected = selectedNews.includes(n.id);
-                        el.classList.toggle('checked', isSelected);
-                        el.textContent = isSelected ? '✓' : '';
-                    }
-                });
             }
+
+            // Update all checkboxes
+            currentNews.forEach((n, i) => {
+                const el = document.getElementById('check-' + i);
+                if (el && !el.classList.contains('disabled')) {
+                    const isSelected = selectedNews.includes(n.id);
+                    el.classList.toggle('checked', isSelected);
+                    el.textContent = isSelected ? '✓' : '';
+                }
+            });
             updateSelectAllBtn();
         }
 
@@ -838,11 +1294,22 @@
         async function createAudio() {
             if (!selectedNews.length) return alert('请至少选择一篇新闻');
             const customTitle = document.getElementById('audio-title-input').value.trim();
+            const voiceFemale = document.getElementById('voice-female-select').value;
+            const voiceMale = document.getElementById('voice-male-select').value;
+            const hostFemaleName = document.getElementById('host-female-name').value.trim();
+            const hostMaleName = document.getElementById('host-male-name').value.trim();
             closeModal('selector-modal');
 
             try {
-                const body = { news_ids: selectedNews, language: 'zh' };
+                const body = {
+                    news_ids: selectedNews,
+                    language: 'zh',
+                    voice_female: voiceFemale,
+                    voice_male: voiceMale
+                };
                 if (customTitle) body.title = customTitle;
+                if (hostFemaleName) body.host_female_name = hostFemaleName;
+                if (hostMaleName) body.host_male_name = hostMaleName;
                 const result = await api('/api/v1/audio', { method: 'POST', body: JSON.stringify(body) });
 
                 if (result.id) {
@@ -887,6 +1354,7 @@
         function hidePlayer() {
             document.getElementById('player').classList.remove('show');
             window.currentPlayingId = null;
+            hideSubtitle();
         }
 
         function showToast(msg) {
@@ -914,6 +1382,13 @@
         }
         function seekAudio(sec) { if (audio) audio.currentTime += sec; }
 
+        function cycleSpeed() {
+            currentSpeedIndex = (currentSpeedIndex + 1) % SPEEDS.length;
+            const speed = SPEEDS[currentSpeedIndex];
+            if (audio) audio.playbackRate = speed;
+            document.getElementById('speed-btn').textContent = speed + 'x';
+        }
+
         async function toggleFavorite(audioId, idx) {
             try {
                 const result = await api(`/api/v1/audio/${audioId}/favorite`, { method: 'POST' });
@@ -934,6 +1409,143 @@
             if (confirm('确定删除这条音频？')) {
                 deleteAudio(audioId);
             }
+        }
+
+        // Transcript viewer
+        let currentTranscriptData = null;
+        let currentTranscriptAudio = null;
+
+        async function viewTranscript(audioId) {
+            try {
+                const audio = window.audioList.find(a => a.id === audioId);
+                if (!audio) return;
+
+                const data = await api(`/api/v1/audio/${audioId}/transcript`);
+                if (!data.transcript || data.transcript.length === 0) {
+                    showToast('暂无文案数据');
+                    return;
+                }
+
+                currentTranscriptData = data.transcript;
+                currentTranscriptAudio = audio;
+
+                const totalDuration = data.transcript.length > 0 ?
+                    data.transcript[data.transcript.length - 1].end : 0;
+
+                let html = `
+                    <div class="transcript-header">
+                        <div class="transcript-title">${audio.title}</div>
+                        <div class="transcript-meta">总时长: ${formatDuration(totalDuration)} · ${data.transcript.length}轮对话</div>
+                    </div>
+                `;
+
+                data.transcript.forEach((item, i) => {
+                    const icon = item.speaker === '小雅' ? '👩' : '👨';
+                    html += `
+                        <div class="transcript-item">
+                            <div class="transcript-speaker">
+                                <span>${icon}</span>
+                                <span class="transcript-speaker-name">${item.speaker}</span>
+                                <span class="transcript-speaker-time">${formatTime(item.start)}</span>
+                            </div>
+                            <div class="transcript-text">${item.text}</div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('transcript-content').innerHTML = html;
+                const modal = document.getElementById('transcript-modal');
+                modal.style.display = '';
+                modal.classList.add('show');
+            } catch (e) {
+                showToast('加载文案失败');
+                console.error(e);
+            }
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function showDownloadOptions() {
+            document.getElementById('download-modal').style.display = 'flex';
+        }
+
+        function downloadTranscript(format) {
+            if (!currentTranscriptData || !currentTranscriptAudio) return;
+
+            let content = '';
+            let filename = '';
+            let mimeType = '';
+
+            const title = currentTranscriptAudio.title || 'transcript';
+
+            if (format === 'txt') {
+                content = `${title}\n${'='.repeat(40)}\n\n`;
+                currentTranscriptData.forEach(item => {
+                    content += `【${item.speaker}】\n${item.text}\n\n`;
+                });
+                filename = `${title}.txt`;
+                mimeType = 'text/plain;charset=utf-8';
+            } else if (format === 'srt') {
+                currentTranscriptData.forEach((item, i) => {
+                    const startTime = formatSrtTime(item.start);
+                    const endTime = formatSrtTime(item.end);
+                    content += `${i + 1}\n${startTime} --> ${endTime}\n${item.speaker}: ${item.text}\n\n`;
+                });
+                filename = `${title}.srt`;
+                mimeType = 'text/plain;charset=utf-8';
+            } else if (format === 'json') {
+                content = JSON.stringify({
+                    title: title,
+                    duration: currentTranscriptAudio.duration,
+                    created_at: currentTranscriptAudio.created_at,
+                    transcript: currentTranscriptData
+                }, null, 2);
+                filename = `${title}.json`;
+                mimeType = 'application/json;charset=utf-8';
+            }
+
+            // Download file
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            document.getElementById('download-modal').style.display = 'none';
+            showToast('下载成功');
+        }
+
+        function formatSrtTime(seconds) {
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds % 1) * 1000);
+            return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+        }
+
+        function cleanText(text) {
+            if (!text) return text;
+            // Remove excessive newlines (more than 2 consecutive)
+            text = text.replace(/\n{3,}/g, '\n\n');
+            // Remove excessive spaces
+            text = text.replace(/[ \t]{2,}/g, ' ');
+            // Trim each line
+            text = text.split('\n').map(line => line.trim()).join('\n');
+            // Remove leading/trailing empty lines
+            text = text.replace(/^\n+|\n+$/g, '');
+            // Convert newlines to <br> for HTML display
+            text = text.replace(/\n/g, '<br>');
+            // Remove excessive <br> tags
+            text = text.replace(/(<br>){3,}/g, '<br><br>');
+            return text;
         }
 
         function copyLink(url) {
@@ -989,7 +1601,11 @@
         async function saveSettings() { await api('/api/v1/settings', { method: 'PUT', body: JSON.stringify(settings) }); alert('已保存'); }
         function toggleTheme() { const d = document.body.classList.toggle('dark'); document.getElementById('theme-toggle').classList.toggle('on', d); localStorage.setItem('theme', d ? 'dark' : 'light'); }
         function loadTheme() { const d = localStorage.getItem('theme') === 'dark'; document.body.classList.toggle('dark', d); document.getElementById('theme-toggle').classList.toggle('on', d); }
-        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('show');
+            el.style.display = 'none';
+        }
         function formatDuration(s) { if (!s) return '0:00'; return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); }
         function formatDateTime(dt) {
             if (!dt) return '';

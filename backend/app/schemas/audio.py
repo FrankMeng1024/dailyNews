@@ -21,6 +21,22 @@ class AudioCreate(BaseModel):
     news_ids: List[int]
     title: Optional[str] = None  # User custom title, optional
     language: AudioLanguage = AudioLanguage.zh
+    voice_female: Optional[str] = None  # Female voice ID, e.g. zh-CN-XiaoxiaoNeural
+    voice_male: Optional[str] = None  # Male voice ID, e.g. zh-CN-YunxiNeural
+    host_female_name: Optional[str] = None  # Custom female host name, default "小雅"
+    host_male_name: Optional[str] = None  # Custom male host name, default "小明"
+    speed: float = 1.15  # Speech speed (0.5-2.0), default slightly faster
+
+
+class VoiceOption(BaseModel):
+    id: str
+    name: str
+    desc: str
+
+
+class VoiceListResponse(BaseModel):
+    female: List[VoiceOption]
+    male: List[VoiceOption]
 
 
 class AudioResponse(BaseModel):
@@ -57,6 +73,18 @@ class AudioStatusResponse(BaseModel):
     status: str
     progress: Optional[int] = None
     message: Optional[str] = None
+
+
+class TranscriptItem(BaseModel):
+    speaker: str
+    text: str
+    start: float
+    end: float
+
+
+class TranscriptResponse(BaseModel):
+    audio_id: int
+    transcript: List[TranscriptItem]
 
 
 # Import here to avoid circular import
