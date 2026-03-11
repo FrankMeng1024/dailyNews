@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI 资讯</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+        /* 全局 scrollbar 样式 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
         :root {
             --bg: #f5f5f7;
             --card: #fff;
@@ -68,18 +73,65 @@
         .progress-percent { font-size: 12px; color: var(--text2); margin-top: 8px; text-align: right; }
 
         .news-list { padding: 12px; }
-        .news-card { background: var(--card); border-radius: 20px; margin-bottom: 12px; overflow: hidden; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 16px 18px; transition: transform 0.2s, box-shadow 0.2s; border: 1px solid rgba(255,255,255,0.05); }
-        .dark .news-card { background: var(--card-gradient); border: 1px solid rgba(255,255,255,0.05); }
-        .news-card:hover { box-shadow: 0 4px 20px rgba(102,126,234,0.15); border-color: rgba(102,126,234,0.2); }
+        /* New Spotify-style horizontal news cards */
+        .news-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 8px; background: var(--card); border: 1px solid transparent; border-radius: 16px; cursor: pointer; transition: all 0.2s ease; }
+        .dark .news-card { background: var(--card-gradient); border-color: rgba(255,255,255,0.05); }
+        .news-card:hover { background: rgba(102,126,234,0.08); border-color: rgba(102,126,234,0.2); transform: translateY(-1px); }
         .news-card:active { transform: scale(0.98); }
-        .news-title { font-size: 15px; font-weight: 600; line-height: 1.5; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .news-meta { display: flex; gap: 8px; color: var(--text2); font-size: 12px; align-items: center; flex-wrap: wrap; }
+        .news-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; transition: transform 0.2s; }
+        .news-card:hover .news-icon { transform: scale(1.05); }
+        .news-info { flex: 1; min-width: 0; }
+        .news-title { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.4; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .news-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text2); }
         .news-source { color: var(--primary); font-weight: 500; }
         .news-time { color: var(--text2); }
-        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+        .news-tag { padding: 2px 8px; border-radius: 8px; background: rgba(102,126,234,0.12); color: var(--primary); font-size: 11px; font-weight: 500; }
+        .news-tag.hot { background: rgba(239,68,68,0.12); color: #ef4444; }
+        .news-tag.verified { background: rgba(52,211,153,0.12); color: #10b981; }
+        .news-type-badge { font-size: 18px; opacity: 0.6; flex-shrink: 0; }
+        /* Legacy badge styles (kept for compatibility) */
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
         .badge-ai { background: rgba(102,126,234,0.15); color: #667eea; }
         .badge-hot { background: rgba(239,68,68,0.12); color: #ef4444; }
-        
+
+        /* Filter tabs */
+        .filter-tab { padding: 6px 16px; border-radius: 20px; background: var(--bg); color: var(--text2); font-size: 13px; white-space: nowrap; cursor: pointer; transition: all 0.3s; border: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
+        .filter-tab.active { background: var(--primary-gradient); color: #fff; border-color: transparent; }
+        .filter-tab:hover { background: rgba(102,126,234,0.1); }
+        .filter-count { font-size: 11px; opacity: 0.7; font-weight: 500; }
+
+        /* Hide scrollbar but keep scroll functionality */
+        .filter-tabs-container {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+
+        .filter-tabs-container::-webkit-scrollbar {
+            display: none; /* Chrome/Safari/Opera */
+        }
+
+        /* Add scroll indicator gradient on mobile */
+        @media (max-width: 600px) {
+            .filter-tabs-wrapper {
+                position: relative;
+            }
+
+            .filter-tabs-wrapper::after {
+                content: '';
+                position: absolute;
+                right: 0;
+                top: 0;
+                bottom: 8px;
+                width: 40px;
+                background: linear-gradient(to right, transparent, var(--bg));
+                pointer-events: none;
+            }
+        }
+
         /* Full screen detail page */
         .detail-page { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 200; display: none; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
         .detail-page.show { display: block; }
@@ -98,9 +150,6 @@
         .detail-tab { flex: 1; padding: 12px; text-align: center; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s; }
         .detail-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
         .detail-tab:hover { color: var(--primary); }
-        .original-title-box { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-        .original-title-label { display: none; }
-        .original-title-text { font-size: 15px; color: var(--text); line-height: 1.5; word-break: break-word; font-weight: 600; }
         .original-content { font-size: 15px; color: var(--text); line-height: 1.7; }
 
         /* Modal Overlay */
@@ -196,6 +245,18 @@
         .spinning { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
+
+        /* Quality Slider Styles */
+        .setting-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .setting-desc { font-size: 13px; color: var(--text2); margin-bottom: 16px; line-height: 1.4; }
+        .quality-slider-container { margin: 16px 0; }
+        #quality-slider { width: 100%; height: 8px; border-radius: 4px; background: linear-gradient(to right, #e0e0e0 0%, #667eea 50%, #764ba2 100%); outline: none; -webkit-appearance: none; }
+        #quality-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: white; border: 3px solid #667eea; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        #quality-slider::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: white; border: 3px solid #667eea; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .quality-slider-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--text2); }
+        .quality-label { font-weight: 700; color: var(--primary); font-size: 14px; }
+        .quality-stats { margin-top: 16px; padding: 12px; background: var(--bg); border-radius: 12px; font-size: 13px; color: var(--text2); line-height: 1.6; }
+
         .toggle { width: 52px; height: 30px; border-radius: 15px; background: var(--border); position: relative; cursor: pointer; transition: background 0.2s; }
         .toggle.on { background: var(--primary-gradient); }
         .toggle::after { content: ''; position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
@@ -237,6 +298,157 @@
         .loading { text-align: center; padding: 20px; color: var(--text2); }
         .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Retry Management Styles */
+        .retry-filter-btn { padding: 8px 16px; border-radius: 20px; background: var(--bg); color: var(--text2); border: 1px solid var(--border); font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+        .retry-filter-btn.active { background: var(--primary-gradient); color: #fff; border-color: transparent; }
+        .retry-filter-btn:hover { background: rgba(102,126,234,0.1); }
+        .retry-item { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+        .dark .retry-item { background: var(--card-gradient); }
+        .retry-item-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px; }
+        .retry-item-title { font-size: 14px; font-weight: 500; color: var(--text); flex: 1; line-height: 1.4; }
+        .retry-item-status { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; margin-left: 8px; }
+        .retry-item-status.pending { background: rgba(251,191,36,0.15); color: #f59e0b; }
+        .retry-item-status.failed { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .retry-item-status.generating { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .retry-item-meta { display: flex; gap: 12px; font-size: 12px; color: var(--text2); margin-bottom: 8px; flex-wrap: wrap; }
+        .retry-item-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .retry-btn { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }
+        .retry-btn-primary { background: var(--primary-gradient); color: #fff; }
+        .retry-btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+        .stat-box { text-align: center; padding: 12px; background: var(--bg); border-radius: 12px; }
+        .stat-number { font-size: 24px; font-weight: 700; color: var(--primary); }
+        .stat-label { font-size: 11px; color: var(--text2); margin-top: 4px; }
+        .history-item { background: var(--bg); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .history-type { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+        .history-type.auto { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .history-type.manual { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+        .history-stats { font-size: 12px; color: var(--text2); }
+        .history-success { color: #10b981; font-weight: 600; }
+        .history-failed { color: #ef4444; font-weight: 600; }
+
+        /* Error Detail Modal Styles */
+        .error-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .error-modal-overlay.show { display: flex; }
+        .error-modal-content { background: var(--card); width: 90%; max-width: 500px; max-height: 80vh; border-radius: 20px; overflow: hidden; }
+        .dark .error-modal-content { background: #1c1c2e; }
+        .error-modal-header { padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        .error-modal-header h3 { font-size: 16px; font-weight: 600; margin: 0; }
+        .error-modal-body { padding: 16px; overflow-y: auto; max-height: calc(80vh - 60px); }
+        .error-section { margin-bottom: 16px; padding: 12px; background: var(--bg); border-radius: 12px; }
+        .error-section h4 { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .error-info { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+        .error-info span { padding: 4px 8px; background: var(--card); border-radius: 6px; }
+        .error-stack { font-size: 11px; color: #ef4444; background: rgba(239,68,68,0.1); padding: 8px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; max-height: 100px; overflow-y: auto; margin-bottom: 8px; }
+        .retry-type-btn { padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }
+        .retry-type-btn.primary { background: var(--primary-gradient); color: #fff; }
+        .retry-type-btn.disabled { background: var(--border); color: var(--text2); cursor: not-allowed; }
+
+        /* Source Status Styles for Dev Fetch */
+        .source-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .source-item:last-child { border-bottom: none; }
+        .source-icon { font-size: 16px; width: 24px; text-align: center; }
+        .source-name { flex: 1; font-size: 13px; }
+        .source-count { font-size: 13px; color: var(--primary); font-weight: 600; }
+
+        /* Dashboard Style - Live News Stream */
+        .dashboard-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+        .dash-stat { text-align: center; padding: 12px 8px; background: rgba(255,255,255,0.05); border-radius: 12px; }
+        .dark .dash-stat { background: rgba(255,255,255,0.03); }
+        .dash-stat-value { font-size: 24px; font-weight: 700; }
+        .dash-stat-value.primary { color: var(--primary); }
+        .dash-stat-value.success { color: #10b981; }
+        .dash-stat-value.warning { color: #f59e0b; }
+        .dash-stat-value.error { color: #ef4444; }
+        .dash-stat-label { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+        /* Live Article Item with 3 Status */
+        .live-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; transition: all 0.3s ease; }
+        .dark .live-item { background: var(--card-gradient); border-color: rgba(255,255,255,0.05); }
+        .live-item.success { opacity: 0.6; transform: scale(0.98); }
+        .live-item.removing { animation: slideOut 0.5s ease forwards; }
+        @keyframes slideOut { to { opacity: 0; transform: translateX(100%); height: 0; padding: 0; margin: 0; border: 0; } }
+        .live-item-title { flex: 1; font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        .live-item-statuses { display: flex; gap: 4px; flex-shrink: 0; }
+        .status-dot { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; }
+        .status-dot.pending { background: rgba(251,191,36,0.15); color: #f59e0b; }
+        .status-dot.blocked { background: rgba(156,163,175,0.15); color: #9ca3af; }
+        .status-dot.loading { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .status-dot.success { background: rgba(16,185,129,0.15); color: #10b981; }
+        .status-dot.failed { background: rgba(239,68,68,0.15); color: #ef4444; cursor: pointer; }
+        .status-dot.loading::after { content: ''; width: 10px; height: 10px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .live-item-action { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text2); transition: all 0.2s; flex-shrink: 0; }
+        .live-item-action:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
+        .live-item-action.hidden { display: none; }
+
+        /* Status Legend */
+        .status-legend { display: flex; gap: 12px; font-size: 11px; color: var(--text2); margin-bottom: 12px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+        .legend-dot.scrape { background: #3b82f6; }
+        .legend-dot.title { background: #8b5cf6; }
+        .legend-dot.refine { background: #10b981; }
+
+        /* Live article item styles */
+        .live-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+        .live-item.has-failed {
+            background: rgba(239, 68, 68, 0.05);
+            margin: 0 -12px;
+            padding: 8px 12px;
+        }
+        .live-item-title {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-right: 8px;
+        }
+        .live-item-statuses {
+            display: flex;
+            gap: 4px;
+        }
+        .status-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .status-dot.success {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+        .status-dot.failed {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+        .status-dot.pending {
+            background: rgba(156, 163, 175, 0.15);
+            color: #9ca3af;
+        }
+        .status-dot.loading {
+            background: rgba(59, 130, 246, 0.15);
+            position: relative;
+        }
+        .status-dot.loading::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border: 2px solid #3b82f6;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
     </style>
 </head>
 <body>
@@ -258,7 +470,32 @@
         <div id="news-page" class="page active">
             <div class="header">
                 <h1>AI 资讯</h1>
-                <button id="refresh-btn" class="header-btn" onclick="fetchNews()">刷新</button>
+            </div>
+            <div style="padding:12px 12px 0 12px;background:var(--bg)">
+                <div class="filter-tabs-wrapper">
+                    <div class="filter-tabs-container">
+                        <div class="filter-tab active" onclick="filterByType('all')">
+                            <span>全部</span>
+                            <span class="filter-count" id="count-all">-</span>
+                        </div>
+                        <div class="filter-tab" onclick="filterByType('news')">
+                            <span>📰 新闻</span>
+                            <span class="filter-count" id="count-news">-</span>
+                        </div>
+                        <div class="filter-tab" onclick="filterByType('blog')">
+                            <span>📝 博客</span>
+                            <span class="filter-count" id="count-blog">-</span>
+                        </div>
+                        <div class="filter-tab" onclick="filterByType('paper')">
+                            <span>📄 论文</span>
+                            <span class="filter-count" id="count-paper">-</span>
+                        </div>
+                        <div class="filter-tab" onclick="filterByType('discussion')">
+                            <span>💬 讨论</span>
+                            <span class="filter-count" id="count-discussion">-</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div id="news-list" class="news-list"><div class="loading"><span class="spinner"></span> 加载中...</div></div>
         </div>
@@ -295,12 +532,171 @@
                     <div id="theme-toggle" class="toggle" onclick="toggleTheme()"></div>
                 </div>
             </div>
+
+            <!-- Quality Level Slider -->
+            <div class="card">
+                <div class="setting-header">
+                    <h3 style="font-weight:600;margin:0;">内容质量筛选</h3>
+                    <span id="quality-level-label" class="quality-label">标准</span>
+                </div>
+                <div class="setting-desc">选择想看的最低质量级别。级别越高，内容质量越好但数量越少</div>
+                <div class="quality-slider-container">
+                    <input type="range" id="quality-slider" min="0" max="2" step="1" value="1" oninput="updateQualityLabel(this.value); debouncedSaveSettings()">
+                    <div class="quality-slider-labels">
+                        <span>全部</span>
+                        <span>标准</span>
+                        <span>精选</span>
+                    </div>
+                </div>
+                <div id="quality-stats" class="quality-stats"></div>
+            </div>
+
             <div class="card">
                 <div style="font-weight:500;margin-bottom:4px;">自动抓取时间</div>
                 <div style="font-size:12px;color:var(--text2);">选择每天自动获取新闻的时间</div>
                 <div id="hours-grid" class="hours-grid"></div>
             </div>
-            <div style="padding:16px"><button class="btn btn-primary" style="width:100%" onclick="saveSettings()">保存设置</button></div>
+
+            <!-- Creator Code Section -->
+            <div class="card">
+                <div style="font-weight:500;margin-bottom:8px;">创作者模式</div>
+                <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">输入创作者代码以访问高级管理功能</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="password" id="creator-code-input" placeholder="输入创作者代码"
+                           style="flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:14px;outline:none;">
+                    <button onclick="verifyCreatorCode()"
+                            style="padding:10px 20px;border-radius:12px;background:var(--primary-gradient);color:#fff;border:none;font-weight:500;cursor:pointer;white-space:nowrap;">
+                        验证
+                    </button>
+                </div>
+                <div id="creator-status" style="margin-top:8px;font-size:12px;"></div>
+            </div>
+
+            <!-- Retry Management (Hidden by default) -->
+            <div id="retry-management-card" class="card" style="display:none;">
+                <div style="font-weight:500;margin-bottom:8px;">🔧 内容重试管理</div>
+                <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">管理失败和待重试的内容生成任务</div>
+                <button onclick="showPage('retry')"
+                        style="width:100%;padding:12px;border-radius:12px;background:var(--primary-gradient);color:#fff;border:none;font-weight:500;cursor:pointer;">
+                    进入管理页面
+                </button>
+            </div>
+
+            <div style="padding:16px;text-align:center;color:var(--text2);font-size:13px;">设置自动保存</div>
+        </div>
+
+        <!-- Retry Management Page -->
+        <div id="retry-page" class="page">
+            <div class="header">
+                <button onclick="showPage('settings')" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text);">←</button>
+                <h1>开发者模式</h1>
+                <button onclick="refreshRetryList()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--primary);">🔄</button>
+            </div>
+
+            <!-- Dashboard Stats -->
+            <div class="card" style="margin:12px;">
+                <div class="dashboard-stats">
+                    <div class="dash-stat">
+                        <div class="dash-stat-value primary" id="stat-total">0</div>
+                        <div class="dash-stat-label">总数</div>
+                    </div>
+                    <div class="dash-stat">
+                        <div class="dash-stat-value success" id="stat-success">0</div>
+                        <div class="dash-stat-label">成功</div>
+                    </div>
+                    <div class="dash-stat">
+                        <div class="dash-stat-value warning" id="stat-pending">0</div>
+                        <div class="dash-stat-label">处理中</div>
+                    </div>
+                    <div class="dash-stat">
+                        <div class="dash-stat-value error" id="stat-failed">0</div>
+                        <div class="dash-stat-label">失败</div>
+                    </div>
+                </div>
+
+                <!-- Fetch Button -->
+                <button id="dev-fetch-btn" onclick="startDevFetch()"
+                        style="width:100%;padding:12px;border-radius:12px;background:var(--primary-gradient);color:#fff;border:none;font-weight:600;cursor:pointer;font-size:14px;">
+                    🚀 开始抓取新闻
+                </button>
+
+                <!-- Progress (hidden by default) -->
+                <div id="fetch-progress-container" style="display:none;margin-top:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span id="fetch-status-text" style="font-size:13px;">准备中...</span>
+                        <span id="fetch-status-icon" class="spinning" style="font-size:16px;">🔄</span>
+                    </div>
+                    <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                        <div id="fetch-progress-bar" style="height:100%;background:var(--primary-gradient);width:0%;transition:width 0.3s;"></div>
+                    </div>
+                </div>
+
+                <!-- Source Status (compact) -->
+                <div id="source-status" style="display:none;margin-top:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+                    <div class="source-item" data-source="hackernews" style="padding:6px 10px;background:var(--bg);border-radius:8px;border:none;">
+                        <span class="source-icon" style="font-size:12px;">⏳</span>
+                        <span class="source-name" style="font-size:12px;">HN</span>
+                        <span class="source-count" style="font-size:11px;">-</span>
+                    </div>
+                    <div class="source-item" data-source="reddit" style="padding:6px 10px;background:var(--bg);border-radius:8px;border:none;">
+                        <span class="source-icon" style="font-size:12px;">⏳</span>
+                        <span class="source-name" style="font-size:12px;">Reddit</span>
+                        <span class="source-count" style="font-size:11px;">-</span>
+                    </div>
+                    <div class="source-item" data-source="rss" style="padding:6px 10px;background:var(--bg);border-radius:8px;border:none;">
+                        <span class="source-icon" style="font-size:12px;">⏳</span>
+                        <span class="source-name" style="font-size:12px;">RSS</span>
+                        <span class="source-count" style="font-size:11px;">-</span>
+                    </div>
+                    <div class="source-item" data-source="newsapi" style="padding:6px 10px;background:var(--bg);border-radius:8px;border:none;">
+                        <span class="source-icon" style="font-size:12px;">⏳</span>
+                        <span class="source-name" style="font-size:12px;">NewsAPI</span>
+                        <span class="source-count" style="font-size:11px;">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live News Stream -->
+            <div class="card" style="margin:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <div style="font-weight:600;">📰 实时新闻流 (<span id="live-articles-count">0</span>)</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button id="refresh-live-btn" onclick="refreshLiveList()" style="padding:4px 10px;border-radius:6px;background:var(--bg);color:var(--primary);border:1px solid var(--border);font-size:11px;cursor:pointer;">🔄 刷新</button>
+                        <button onclick="filterLiveList('all')" class="live-filter-btn active" data-filter="all" style="padding:4px 10px;border-radius:6px;background:var(--primary);color:#fff;border:none;font-size:11px;cursor:pointer;">全部</button>
+                        <button onclick="filterLiveList('failed')" class="live-filter-btn" data-filter="failed" style="padding:4px 10px;border-radius:6px;background:var(--bg);color:var(--text2);border:1px solid var(--border);font-size:11px;cursor:pointer;">失败</button>
+                    </div>
+                </div>
+
+                <!-- Status Legend -->
+                <div style="display:flex;gap:12px;font-size:10px;color:var(--text2);margin-bottom:8px;padding:6px 8px;background:var(--bg);border-radius:6px;">
+                    <div style="display:flex;align-items:center;gap:3px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(16,185,129,0.15);color:#10b981;font-size:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;">✓</div>成功</div>
+                    <div style="display:flex;align-items:center;gap:3px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,0.15);color:#ef4444;font-size:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;">✗</div>失败</div>
+                    <div style="display:flex;align-items:center;gap:3px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(156,163,175,0.15);color:#9ca3af;font-size:8px;display:flex;align-items:center;justify-content:center;">-</div>待处理</div>
+                    <span style="margin-left:auto;color:var(--text2);">顺序: 抓取 | 翻译 | 精炼</span>
+                </div>
+
+                <!-- Live List -->
+                <div id="live-articles-list" style="max-height:400px;overflow-y:auto;">
+                    <div style="text-align:center;padding:40px;color:var(--text2);font-size:13px;">
+                        点击上方按钮开始抓取新闻
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fetch Log (collapsible) -->
+            <div class="card" style="margin:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleFetchLog()">
+                    <div style="font-weight:600;font-size:13px;">📋 抓取日志</div>
+                    <span id="log-toggle-btn" style="color:var(--primary);font-size:12px;">展开</span>
+                </div>
+                <div id="fetch-log" style="display:none;max-height:150px;overflow-y:auto;font-size:10px;font-family:monospace;background:var(--bg);padding:8px;border-radius:8px;margin-top:8px;"></div>
+            </div>
+
+            <!-- Fetch History -->
+            <div class="card" style="margin:12px;">
+                <div style="font-weight:600;margin-bottom:12px;font-size:13px;">📊 抓取历史</div>
+                <div id="fetch-history" style="max-height:200px;overflow-y:auto;"></div>
+            </div>
         </div>
 
         <!-- Tab Bar -->
@@ -426,6 +822,19 @@
         </div>
     </div>
 
+    <!-- Error Detail Modal -->
+    <div id="error-detail-modal" class="error-modal-overlay">
+        <div class="error-modal-content">
+            <div class="error-modal-header">
+                <h3>🔍 错误详情</h3>
+                <span class="modal-close" onclick="closeErrorModal()">×</span>
+            </div>
+            <div class="error-modal-body" id="error-detail-content">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+    </div>
+
     <!-- TTS Compare Modal -->
     <div id="tts-compare-modal" class="modal-overlay" style="display:none">
         <div class="modal-content" style="background:var(--card);border-radius:20px;padding:20px;margin:20px;max-width:360px;">
@@ -500,6 +909,8 @@
         const API = '';
         let token = localStorage.getItem('token');
         let currentNews = [];
+        let allNews = []; // Store all news for filtering
+        let currentFilter = 'all'; // Current filter type
         let selectedNews = [];
         let settings = { fetch_hours: ['8','12','18'] };
         let audio = null;
@@ -512,6 +923,53 @@
         // Debug helper
         function log(msg) {
             console.log('[AI资讯]', msg);
+        }
+
+        // Debounce utility - prevents function from being called too frequently
+        let saveSettingsTimeout = null;
+
+        function debouncedSaveSettings() {
+            // Clear existing timeout
+            if (saveSettingsTimeout) {
+                clearTimeout(saveSettingsTimeout);
+            }
+
+            // Set new timeout - will save after 1 second of no changes
+            saveSettingsTimeout = setTimeout(async () => {
+                await saveSettingsNow();
+            }, 1000);
+        }
+
+        async function saveSettingsNow() {
+            try {
+                const sliderValue = document.getElementById('quality-slider').value;
+                const qualityLevel = qualityLevels[sliderValue];
+
+                const updatedSettings = {
+                    fetch_hours: settings.fetch_hours,
+                    quality_level: qualityLevel,
+                    theme: settings.theme,
+                    audio_language: settings.audio_language
+                };
+
+                await api('/api/v1/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedSettings)
+                });
+
+                // Update local settings
+                settings = updatedSettings;
+
+                // Reload news with new quality filter
+                await loadNews();
+
+                // Show subtle toast instead of alert
+                showToast('设置已保存');
+            } catch (e) {
+                console.error('Save settings error:', e);
+                showToast('保存失败');
+            }
         }
 
         async function init() {
@@ -721,6 +1179,11 @@
             }).catch(e => {
                 console.error('API error:', url, e);
                 log('API error: ' + url + ' - ' + e.message);
+                // For POST/PUT/DELETE requests, propagate error with error field
+                // For GET requests (list operations), return empty items
+                if (options.method && options.method !== 'GET') {
+                    return { error: e.message };
+                }
                 return { items: [], error: e.message };
             });
         }
@@ -732,14 +1195,144 @@
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(name + '-page').classList.add('active');
-            document.querySelectorAll('.tab')[['news','audio','settings'].indexOf(name)].classList.add('active');
+
+            // Only update tab bar for main pages
+            const tabIndex = ['news','audio','settings'].indexOf(name);
+            if (tabIndex >= 0) {
+                document.querySelectorAll('.tab')[tabIndex].classList.add('active');
+            }
+
+            // Load retry page data if entering retry page
+            if (name === 'retry') {
+                loadRetryStats();
+                loadFetchHistory();
+                loadRecentArticles(); // 加载最近的文章状态
+            } else {
+                // Clear countdown when leaving retry page
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+            }
+        }
+
+        // 加载最近的文章状态（用于重新进入页面时显示）
+        async function loadRecentArticles() {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) return;
+
+            const list = document.getElementById('live-articles-list');
+            if (!list) return;
+
+            // 每次进入页面都重新加载，不使用缓存
+
+            try {
+                const response = await fetch('/api/v1/admin/retry-list?limit=30', {
+                    headers: { 'X-Creator-Code': code }
+                });
+
+                if (!response.ok) return;
+
+                const data = await response.json();
+                if (!data.items || data.items.length === 0) {
+                    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);font-size:13px;">点击上方按钮开始抓取新闻</div>';
+                    return;
+                }
+
+                // 显示最近的文章
+                list.innerHTML = '';
+                const countEl = document.getElementById('live-articles-count');
+                if (countEl) countEl.textContent = data.items.length;
+
+                data.items.forEach(item => {
+                    const contentStatus = item.content_status || 'pending';
+                    const getStatusDot = (s) => {
+                        if (s === 'success' || s === 'ready') return '<div class="status-dot success">✓</div>';
+                        if (s === 'failed' || s === 'scrape_failed') return '<div class="status-dot failed">✗</div>';
+                        if (s === 'blocked') return '<div class="status-dot blocked">⏸</div>';
+                        if (s === 'loading' || s === 'generating') return '<div class="status-dot loading"></div>';
+                        return '<div class="status-dot pending">-</div>';
+                    };
+
+                    const hasFailed = contentStatus === 'failed' || contentStatus === 'scrape_failed';
+                    const div = document.createElement('div');
+                    div.className = `live-item ${hasFailed ? 'has-failed' : ''}`;
+                    div.innerHTML = `
+                        <div class="live-item-title">${(item.title || '无标题').slice(0, 40)}...</div>
+                        <div class="live-item-statuses">
+                            <div title="原文抓取">${getStatusDot('success')}</div>
+                            <div title="标题翻译">${getStatusDot(item.title_zh ? 'success' : 'pending')}</div>
+                            <div title="内容精炼">${getStatusDot(contentStatus)}</div>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                console.error('Failed to load recent articles:', e);
+            }
         }
 
         async function loadNews() {
             document.getElementById('news-list').innerHTML = '<div class="loading"><span class="spinner"></span> 加载中...</div>';
-            const data = await api('/api/v1/news?limit=50');
-            currentNews = data.items || [];
+
+            // Get user's quality level preference from settings
+            const qualityLevel = settings.quality_level || 'standard';
+
+            // Pass currentFilter as source_type to API for server-side filtering
+            const data = await api(`/api/v1/news?limit=50&quality_level=${qualityLevel}&source_type=${currentFilter}`);
+            allNews = data.items || [];
+            currentNews = allNews;
             renderNews();
+
+            // Update filter counts
+            updateFilterCounts(qualityLevel);
+        }
+
+        async function updateFilterCounts(qualityLevel) {
+            const types = ['all', 'news', 'blog', 'paper', 'discussion'];
+
+            // Show loading state
+            types.forEach(type => {
+                const countEl = document.getElementById(`count-${type}`);
+                if (countEl) {
+                    countEl.textContent = '...';
+                    countEl.style.opacity = '0.5';
+                }
+            });
+
+            for (const type of types) {
+                try {
+                    const data = await api(`/api/v1/news?limit=1&quality_level=${qualityLevel}&source_type=${type}`);
+                    const count = data.total || 0;
+                    const countEl = document.getElementById(`count-${type}`);
+                    if (countEl) {
+                        countEl.textContent = count;
+                        countEl.style.opacity = '1';
+                    }
+                } catch (e) {
+                    console.error(`Failed to load count for ${type}:`, e);
+                    const countEl = document.getElementById(`count-${type}`);
+                    if (countEl) {
+                        countEl.textContent = '-';
+                        countEl.style.opacity = '1';
+                    }
+                }
+            }
+        }
+
+        function filterByType(type) {
+            currentFilter = type;
+            // Update active tab
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // 修复：使用 event.currentTarget 确保总是获取到 .filter-tab 元素
+            const targetTab = event.currentTarget || event.target.closest('.filter-tab');
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+            // Reload with server-side filter
+            loadNews();
         }
 
         // Wake lock to prevent screen sleep during fetch
@@ -748,30 +1341,91 @@
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake lock activated');
+
+                    // Handle wake lock release (can happen automatically)
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake lock released');
+                    });
+                } else {
+                    console.warn('Wake Lock API not supported in this browser');
                 }
-            } catch (e) { console.log('Wake lock not supported'); }
+            } catch (e) {
+                console.error('Wake lock request failed:', e.message || e);
+            }
         }
         function releaseWakeLock() {
-            if (wakeLock) { wakeLock.release(); wakeLock = null; }
+            if (wakeLock) {
+                wakeLock.release();
+                wakeLock = null;
+                console.log('Wake lock manually released');
+            }
+        }
+
+        function getSourceTypeIcon(sourceType) {
+            const icons = {
+                'news': '📰',
+                'blog': '📝',
+                'paper': '📄',
+                'discussion': '💬',
+                'podcast': '🎙️',
+                'video': '📹'
+            };
+            return icons[sourceType] || '📰';
+        }
+
+        function getSourceTypeName(sourceType) {
+            const names = {
+                'news': 'NEWS',
+                'blog': 'BLOG',
+                'paper': 'PAPER',
+                'discussion': 'DISCUSS',
+                'podcast': 'PODCAST',
+                'video': 'VIDEO'
+            };
+            return names[sourceType] || 'NEWS';
+        }
+
+        function getSourceTypeColor(sourceType) {
+            const colors = {
+                'news': 'background: #e6f7ff; color: #1890ff',
+                'blog': 'background: #f0f5ff; color: #597ef7',
+                'paper': 'background: #f6ffed; color: #52c41a',
+                'discussion': 'background: #fff7e6; color: #fa8c16',
+                'podcast': 'background: #fff0f6; color: #eb2f96',
+                'video': 'background: #fff1f0; color: #ff4d4f'
+            };
+            return colors[sourceType] || colors['news'];
         }
 
         function renderNews() {
             const list = document.getElementById('news-list');
             if (!currentNews.length) {
-                list.innerHTML = '<div class="empty"><div class="empty-icon">📰</div><div>暂无资讯</div><div style="margin-top:8px;font-size:13px">点击刷新获取最新内容</div></div>';
+                list.innerHTML = '<div class="empty"><div class="empty-icon">📰</div><div>暂无资讯</div></div>';
                 return;
             }
-            list.innerHTML = currentNews.map((n, i) => `
+            list.innerHTML = currentNews.map((n, i) => {
+                const sourceType = n.source_type || 'news';
+                const icon = getSourceTypeIcon(sourceType);
+                const isVerified = n.is_verified || false;
+                const isHot = (n.final_score || 0) > 0.8;
+
+                return `
                 <div class="news-card" onclick="showDetail(${i})">
-                    <div class="news-title">${n.title_zh || n.title}</div>
-                    <div class="news-meta">
-                        <span class="news-source">${n.source_name}</span>
-                        <span class="news-time">${formatRelativeTime(n.published_at)}</span>
-                        ${n.category === 'ai' ? '<span class="badge badge-ai">AI</span>' : ''}
-                        ${(n.final_score || 0) > 0.8 ? '<span class="badge badge-hot">热门</span>' : ''}
+                    <div class="news-icon">${icon}</div>
+                    <div class="news-info">
+                        <div class="news-title">${n.title_zh || n.title}</div>
+                        <div class="news-meta">
+                            <span class="news-source">${n.source_name}</span>
+                            <span>·</span>
+                            <span class="news-time">${formatRelativeTime(n.published_at)}</span>
+                            ${isVerified ? '<span class="news-tag verified">✓ 已验证</span>' : ''}
+                            ${isHot ? '<span class="news-tag hot">热门</span>' : ''}
+                        </div>
                     </div>
+                    <div class="news-type-badge">${icon}</div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function formatRelativeTime(dateStr) {
@@ -803,53 +1457,6 @@
             document.getElementById('progress-text').classList.remove('show');
         }
 
-        async function fetchNews() {
-            const btn = document.getElementById('refresh-btn');
-            btn.disabled = true;
-            btn.classList.add('loading');
-            await requestWakeLock();
-
-            try {
-                const result = await api('/api/v1/news/fetch', { method: 'POST' });
-
-                if (result.task_id) {
-                    await pollFetchStatus(result.task_id, btn);
-                }
-
-                await loadNews();
-            } catch (e) {
-                console.error(e);
-            }
-
-            releaseWakeLock();
-            btn.classList.remove('loading');
-            btn.disabled = false;
-            btn.textContent = '拉取';
-        }
-
-        async function pollFetchStatus(taskId, btn) {
-            for (let i = 0; i < 120; i++) {
-                try {
-                    const status = await api(`/api/v1/news/fetch/status/${taskId}`);
-
-                    // Update button text based on progress
-                    if (status.progress) {
-                        if (status.progress.includes('Fetching')) btn.textContent = '拉取中';
-                        else if (status.progress.includes('GLM') || status.progress.includes('Generating')) btn.textContent = '分析中';
-                        else if (status.progress.includes('Saving') || status.progress.includes('Saved')) btn.textContent = '保存中';
-                    }
-
-                    if (status.status === 'completed' || status.status === 'failed') {
-                        return;
-                    }
-
-                    await new Promise(r => setTimeout(r, 500));
-                } catch (e) {
-                    await new Promise(r => setTimeout(r, 500));
-                }
-            }
-        }
-
         function showDetail(i) {
             const n = currentNews[i];
             window.currentDetailNews = n;
@@ -864,6 +1471,13 @@
             // Check if we have English title different from Chinese
             const hasEnglishTitle = n.title_zh && n.title !== n.title_zh;
 
+            // Get source type info
+            const sourceType = n.source_type || 'news';
+            const icon = getSourceTypeIcon(sourceType);
+            const typeName = getSourceTypeName(sourceType);
+            const typeColor = getSourceTypeColor(sourceType);
+            const isVerified = n.is_verified || false;
+
             // Store for tab switching
             window.detailContent = {
                 refined,
@@ -874,11 +1488,18 @@
 
             document.getElementById('detail-body').innerHTML = `
                 <div class="detail-content">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+                        <span style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;${typeColor}">
+                            ${icon} ${typeName}
+                        </span>
+                        ${isVerified ? '<span style="display:inline-flex;align-items:center;padding:3px 8px;background:#f6ffed;color:#52c41a;border-radius:6px;font-size:11px;font-weight:600">✓ 已验证</span>' : ''}
+                    </div>
                     <div class="detail-title">${n.title_zh || n.title}</div>
                     <div class="detail-meta">
                         <span class="news-source">${n.source_name}</span>
                         <span>${formatRelativeTime(n.published_at)}</span>
                         ${n.category === 'ai' ? '<span class="badge badge-ai">AI</span>' : ''}
+                        ${n.ai_relevance_score && n.ai_relevance_score > 0.8 ? '<span class="badge" style="background:rgba(52,211,153,0.15);color:#10b981">高相关</span>' : ''}
                     </div>
                     <div class="detail-tabs">
                         <div class="detail-tab active" onclick="switchTab('original')">原文</div>
@@ -886,10 +1507,6 @@
                         ${n.source_url ? `<div class="detail-tab" onclick="switchTab('link')">阅读原文</div>` : ''}
                     </div>
                     <div id="detail-text" class="detail-text">
-                        <div class="original-title-box">
-                            <div class="original-title-label">📰 原文标题</div>
-                            <div class="original-title-text">${n.title}</div>
-                        </div>
                         <div class="original-content">${cleanText(original) || '暂无原文内容'}</div>
                     </div>
                     <div id="detail-link-panel" style="display:none">
@@ -927,13 +1544,7 @@
                 const n = window.currentDetailNews;
                 if (type === 'original') {
                     const cleanContent = cleanText(window.detailContent.original || '暂无原文内容');
-                    textEl.innerHTML = `
-                        <div class="original-title-box">
-                            <div class="original-title-label">📰 原文标题</div>
-                            <div class="original-title-text">${n.title}</div>
-                        </div>
-                        <div class="original-content">${cleanContent}</div>
-                    `;
+                    textEl.innerHTML = `<div class="original-content">${cleanContent}</div>`;
                 } else {
                     const cleanContent = cleanText(window.detailContent.refined || '精炼生成中...');
                     textEl.innerHTML = `<div class="original-content">${cleanContent}</div>`;
@@ -1591,14 +2202,70 @@
             }
         }
 
-        async function loadSettings() { settings = await api('/api/v1/settings'); renderHoursGrid(); }
+        // Quality level mapping
+        const qualityLevels = ['all', 'standard', 'premium'];
+        const qualityLevelNames = {
+            'all': '全部',
+            'standard': '标准',
+            'premium': '精选'
+        };
+
+        async function loadQualityLevels() {
+            try {
+                const data = await api('/api/v1/settings/quality-levels');
+                if (!data || !data.levels) return;
+
+                const stats = data.statistics;
+                const levels = data.levels;
+
+                // Update stats display
+                const statsHtml = `
+                    <div>总文章数: ${stats.total_articles} 篇</div>
+                    <div>精选: ${levels[0].article_count} 篇 (${levels[0].threshold.toFixed(2)}+)</div>
+                    <div>标准: ${levels[1].article_count} 篇 (${levels[1].threshold.toFixed(2)}+)</div>
+                    <div>全部: ${levels[2].article_count} 篇</div>
+                `;
+                const el = document.getElementById('quality-stats');
+                if (el) el.innerHTML = statsHtml;
+            } catch (e) {
+                console.error('Failed to load quality levels:', e);
+            }
+        }
+
+        function updateQualityLabel(value) {
+            const level = qualityLevels[value];
+            const el = document.getElementById('quality-level-label');
+            if (el) el.textContent = qualityLevelNames[level];
+        }
+
+        async function loadSettings() {
+            try {
+                settings = await api('/api/v1/settings');
+
+                // Load quality level
+                if (settings.quality_level) {
+                    const sliderValue = qualityLevels.indexOf(settings.quality_level);
+                    const sliderEl = document.getElementById('quality-slider');
+                    if (sliderEl) {
+                        sliderEl.value = sliderValue >= 0 ? sliderValue : 1;
+                        updateQualityLabel(sliderEl.value);
+                    }
+                }
+
+                // Load quality stats
+                await loadQualityLevels();
+
+                renderHoursGrid();
+            } catch (e) {
+                console.error('Load settings error:', e);
+            }
+        }
         function renderHoursGrid() {
             document.getElementById('hours-grid').innerHTML = Array.from({length: 24}, (_, i) => `
                 <div class="hour-btn ${settings.fetch_hours?.includes(String(i)) ? 'selected' : ''}" onclick="toggleHour(${i})">${String(i).padStart(2,'0')}:00</div>
             `).join('');
         }
-        function toggleHour(h) { const s = String(h), idx = settings.fetch_hours.indexOf(s); idx > -1 ? settings.fetch_hours.splice(idx, 1) : settings.fetch_hours.push(s); renderHoursGrid(); }
-        async function saveSettings() { await api('/api/v1/settings', { method: 'PUT', body: JSON.stringify(settings) }); alert('已保存'); }
+        function toggleHour(h) { const s = String(h), idx = settings.fetch_hours.indexOf(s); idx > -1 ? settings.fetch_hours.splice(idx, 1) : settings.fetch_hours.push(s); renderHoursGrid(); debouncedSaveSettings(); }
         function toggleTheme() { const d = document.body.classList.toggle('dark'); document.getElementById('theme-toggle').classList.toggle('on', d); localStorage.setItem('theme', d ? 'dark' : 'light'); }
         function loadTheme() { const d = localStorage.getItem('theme') === 'dark'; document.body.classList.toggle('dark', d); document.getElementById('theme-toggle').classList.toggle('on', d); }
         function closeModal(id) {
@@ -1619,6 +2286,782 @@
                 return '昨天 ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
             }
             return (d.getMonth()+1) + '-' + d.getDate() + ' ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        }
+
+        // ========== Creator Code & Retry Management ==========
+        let creatorCodeVerified = false;
+        let currentRetryFilter = 'all';
+
+        async function verifyCreatorCode() {
+            const input = document.getElementById('creator-code-input');
+            const code = input.value.trim();
+            const statusEl = document.getElementById('creator-status');
+
+            if (!code) {
+                statusEl.innerHTML = '<span style="color:#ef4444;">请输入创作者代码</span>';
+                return;
+            }
+
+            statusEl.innerHTML = '<span style="color:var(--text2);"><span class="spinner" style="width:12px;height:12px;border-width:2px;margin-right:6px;"></span>验证中...</span>';
+
+            try {
+                const response = await fetch('/api/v1/admin/verify-code?code=' + encodeURIComponent(code), {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    statusEl.innerHTML = '<span style="color:#ef4444;">服务器错误 (HTTP ' + response.status + ')</span>';
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.valid) {
+                    creatorCodeVerified = true;
+                    localStorage.setItem('creatorCode', code);
+                    statusEl.innerHTML = '<span style="color:#10b981;">✓ 验证成功！创作者模式已启用</span>';
+                    document.getElementById('retry-management-card').style.display = 'block';
+                    input.value = '';
+                } else {
+                    statusEl.innerHTML = '<span style="color:#ef4444;">✗ 代码错误，请重试</span>';
+                }
+            } catch (e) {
+                console.error('Verify code error:', e);
+                statusEl.innerHTML = '<span style="color:#ef4444;">验证失败: ' + (e.message || '网络错误') + '</span>';
+            }
+        }
+
+        async function loadRetryStats() {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) {
+                console.log('No creator code, skipping stats load');
+                return;
+            }
+
+            // Show loading state
+            const statTotal = document.getElementById('stat-total');
+            const statSuccess = document.getElementById('stat-success');
+            const statPending = document.getElementById('stat-pending');
+            const statFailed = document.getElementById('stat-failed');
+
+            if (statTotal) statTotal.textContent = '...';
+            if (statSuccess) statSuccess.textContent = '...';
+            if (statPending) statPending.textContent = '...';
+            if (statFailed) statFailed.textContent = '...';
+
+            try {
+                const response = await fetch('/api/v1/admin/content-status', {
+                    headers: { 'X-Creator-Code': code }
+                });
+
+                if (!response.ok) {
+                    console.error('Stats API error:', response.status);
+                    if (statTotal) statTotal.textContent = '-';
+                    if (statSuccess) statSuccess.textContent = '-';
+                    if (statPending) statPending.textContent = '-';
+                    if (statFailed) statFailed.textContent = '-';
+                    return;
+                }
+
+                const data = await response.json();
+                if (!data || !data.status_counts) {
+                    console.log('No status_counts in response');
+                    return;
+                }
+
+                // Update dashboard stats
+                const counts = data.status_counts;
+                const total = (counts.ready || 0) + (counts.pending || 0) + (counts.failed || 0) + (counts.generating || 0);
+
+                if (statTotal) statTotal.textContent = total;
+                if (statSuccess) statSuccess.textContent = counts.ready || 0;
+                if (statPending) statPending.textContent = (counts.pending || 0) + (counts.generating || 0);
+                if (statFailed) statFailed.textContent = counts.failed || 0;
+            } catch (e) {
+                console.error('Failed to load retry stats:', e);
+                // Show error state
+                if (statTotal) statTotal.textContent = '-';
+                if (statSuccess) statSuccess.textContent = '-';
+                if (statPending) statPending.textContent = '-';
+                if (statFailed) statFailed.textContent = '-';
+            }
+        }
+
+        async function loadRetryList(status = null) {
+            // This function is no longer needed as we use the live stream
+            // Keep it as a no-op for compatibility
+            console.log('loadRetryList called, but using live stream instead');
+        }
+
+        function getStatusText(status) {
+            const map = {
+                'pending': '待重试',
+                'failed': '失败',
+                'generating': '生成中',
+                'ready': '已完成'
+            };
+            return map[status] || status;
+        }
+
+        function filterRetryList(status) {
+            currentRetryFilter = status;
+            document.querySelectorAll('.retry-filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.status === status);
+            });
+            loadRetryList(status === 'all' ? null : status);
+        }
+
+        async function manualRetry(newsIds) {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) return;
+
+            try {
+                const response = await fetch('/api/v1/admin/manual-retry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Creator-Code': code
+                    },
+                    body: JSON.stringify({ news_ids: newsIds })
+                });
+                const data = await response.json();
+
+                alert(`重试完成！\n成功: ${data.success}\n失败: ${data.failed}`);
+                refreshRetryList();
+            } catch (e) {
+                alert('重试失败: ' + e.message);
+            }
+        }
+
+        async function resetAllFailed() {
+            if (!confirm('确定要重置所有失败的新闻吗？这将把它们重新标记为待重试状态。')) {
+                return;
+            }
+
+            const code = localStorage.getItem('creatorCode');
+            if (!code) return;
+
+            try {
+                const response = await fetch('/api/v1/admin/reset-all-failed', {
+                    method: 'POST',
+                    headers: { 'X-Creator-Code': code }
+                });
+                const data = await response.json();
+
+                alert(data.message);
+                refreshRetryList();
+            } catch (e) {
+                alert('重置失败: ' + e.message);
+            }
+        }
+
+        function refreshRetryList() {
+            loadRetryStats();
+            loadFetchHistory();
+        }
+
+        async function loadFetchHistory() {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) {
+                console.log('No creator code, skipping history load');
+                return;
+            }
+
+            const historyEl = document.getElementById('fetch-history');
+            if (!historyEl) return;
+
+            // Show loading state
+            historyEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);font-size:12px;"><span class="spinner"></span> 加载中...</div>';
+
+            try {
+                const response = await fetch('/api/v1/admin/fetch-history?limit=10', {
+                    headers: { 'X-Creator-Code': code }
+                });
+
+                if (!response.ok) {
+                    console.error('History API error:', response.status);
+                    historyEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);font-size:12px;">加载失败 (HTTP ' + response.status + ')</div>';
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!data.items || data.items.length === 0) {
+                    historyEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);font-size:12px;">暂无抓取记录</div>';
+                    return;
+                }
+
+                const itemsHtml = data.items.map(item => {
+                    const timeStr = formatDateTime(item.started_at);
+                    const statusColor = item.status === 'completed' ? '#10b981' : item.status === 'failed' ? '#ef4444' : '#f59e0b';
+                    const statusText = item.status === 'completed' ? '成功' : item.status === 'failed' ? '失败' : '进行中';
+
+                    return `
+                        <div class="history-item">
+                            <div style="flex:1;">
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                                    <span style="padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(${statusColor === '#10b981' ? '16,185,129' : statusColor === '#ef4444' ? '239,68,68' : '245,158,11'},0.15);color:${statusColor};">${statusText}</span>
+                                    <span style="font-size:11px;color:var(--text2);">${timeStr}</span>
+                                    ${item.duration_seconds ? `<span style="font-size:11px;color:var(--text2);">· ${item.duration_seconds}秒</span>` : ''}
+                                </div>
+                                <div class="history-stats">
+                                    发现 ${item.articles_found || 0} 条 ·
+                                    <span class="history-success">新增 ${item.articles_new || 0}</span> ·
+                                    <span style="color:var(--text2);">过滤 ${item.articles_filtered || 0}</span>
+                                </div>
+                                ${item.error_message ? `<div style="font-size:10px;color:#ef4444;margin-top:4px;">错误: ${item.error_message}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                historyEl.innerHTML = itemsHtml;
+            } catch (e) {
+                console.error('Failed to load fetch history:', e);
+                historyEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);font-size:12px;">加载失败: ' + e.message + '</div>';
+            }
+        }
+
+        async function retryAllPending() {
+            if (!confirm('确定要立即重试所有待处理的新闻吗？这可能需要一些时间。')) {
+                return;
+            }
+
+            const code = localStorage.getItem('creatorCode');
+            if (!code) return;
+
+            try {
+                const response = await fetch('/api/v1/admin/retry-all-pending', {
+                    method: 'POST',
+                    headers: { 'X-Creator-Code': code }
+                });
+                const data = await response.json();
+
+                alert(data.message);
+                refreshRetryList();
+            } catch (e) {
+                alert('重试失败: ' + e.message);
+            }
+        }
+
+        let countdownInterval = null;
+
+        async function loadNextRetryTime() {
+            // No longer needed - using live stream
+            // Keep as no-op for compatibility
+        }
+
+        function startCountdown(seconds) {
+            // No longer needed - countdown display removed
+            // Keep as no-op for compatibility
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+        }
+
+        // Check creator code on page load
+        // ========== Error Details Modal Functions ==========
+
+        async function showErrorDetails(newsId) {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) {
+                alert('请先验证创作者代码');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/admin/error-details/${newsId}`, {
+                    headers: { 'X-Creator-Code': code }
+                });
+                const data = await response.json();
+
+                if (response.status === 404) {
+                    alert('新闻不存在');
+                    return;
+                }
+
+                const content = document.getElementById('error-detail-content');
+                content.innerHTML = `
+                    <div class="error-section">
+                        <h4>📰 文章信息</h4>
+                        <div style="font-size:14px;color:var(--text);line-height:1.5;">
+                            <div style="font-weight:600;margin-bottom:4px;">${data.title_zh || data.title}</div>
+                            <div style="font-size:12px;color:var(--text2);">${data.source_name} · ${data.published_at ? new Date(data.published_at).toLocaleString() : '未知时间'}</div>
+                        </div>
+                    </div>
+
+                    <div class="error-section">
+                        <h4>🔍 爬虫状态</h4>
+                        <div class="error-info">
+                            <span>状态: ${getFailureStatusText(data.failures.scraping.status)}</span>
+                            <span>重试: ${data.failures.scraping.retry_count}/${data.failures.scraping.max_retries}</span>
+                            <span>内容: ${data.failures.scraping.content_length}字符</span>
+                        </div>
+                        ${data.failures.scraping.last_error ? `<div class="error-stack">${data.failures.scraping.last_error}</div>` : '<div style="font-size:12px;color:#10b981;">✓ 无错误</div>'}
+                        ${data.can_retry.scraping ? `<button class="retry-type-btn primary" onclick="retrySpecific(${newsId}, 'scraping')">🔄 重试爬虫</button>` : `<button class="retry-type-btn disabled" disabled>已达最大重试次数</button>`}
+                    </div>
+
+                    <div class="error-section">
+                        <h4>🤖 GLM 内容生成</h4>
+                        <div class="error-info">
+                            <span>状态: ${getFailureStatusText(data.failures.glm.status)}</span>
+                            <span>重试: ${data.failures.glm.retry_count}/${data.failures.glm.max_retries}</span>
+                            <span>内容: ${data.failures.glm.content_length}字符</span>
+                        </div>
+                        ${data.failures.glm.last_error ? `<div class="error-stack">${data.failures.glm.last_error}</div>` : '<div style="font-size:12px;color:#10b981;">✓ 无错误</div>'}
+                        ${data.can_retry.glm ? `<button class="retry-type-btn primary" onclick="retrySpecific(${newsId}, 'glm')">🔄 重试GLM</button>` : `<button class="retry-type-btn disabled" disabled>${data.failures.glm.status === 'ready' ? '已完成' : '已达最大重试次数'}</button>`}
+                    </div>
+
+                    <div class="error-section">
+                        <h4>🌐 标题翻译</h4>
+                        <div class="error-info">
+                            <span>状态: ${getFailureStatusText(data.failures.title_translation.status)}</span>
+                            <span>重试: ${data.failures.title_translation.retry_count}/${data.failures.title_translation.max_retries}</span>
+                            <span>已翻译: ${data.failures.title_translation.has_translation ? '是' : '否'}</span>
+                        </div>
+                        ${data.failures.title_translation.last_error ? `<div class="error-stack">${data.failures.title_translation.last_error}</div>` : '<div style="font-size:12px;color:#10b981;">✓ 无错误</div>'}
+                        ${data.can_retry.title ? `<button class="retry-type-btn primary" onclick="retrySpecific(${newsId}, 'title')">🔄 重试翻译</button>` : `<button class="retry-type-btn disabled" disabled>${data.failures.title_translation.status === 'ready' ? '已完成' : '已达最大重试次数'}</button>`}
+                    </div>
+                `;
+
+                document.getElementById('error-detail-modal').classList.add('show');
+            } catch (e) {
+                console.error('Failed to load error details:', e);
+                alert('加载错误详情失败: ' + e.message);
+            }
+        }
+
+        function getFailureStatusText(status) {
+            const map = {
+                'pending': '⏳ 待处理',
+                'failed': '❌ 失败',
+                'generating': '🔄 生成中',
+                'ready': '✅ 成功',
+                'success': '✅ 成功'
+            };
+            return map[status] || status;
+        }
+
+        async function retrySpecific(newsId, retryType) {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) {
+                alert('请先验证创作者代码');
+                return;
+            }
+
+            const typeNames = {
+                'scraping': '爬虫',
+                'glm': 'GLM内容生成',
+                'title': '标题翻译'
+            };
+
+            try {
+                const response = await fetch(`/api/v1/admin/retry-specific?news_id=${newsId}&retry_type=${retryType}`, {
+                    method: 'POST',
+                    headers: { 'X-Creator-Code': code }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`${typeNames[retryType]} 重试成功！\n${data.message || ''}`);
+                } else {
+                    alert(`${typeNames[retryType]} 重试失败：${data.message || '未知错误'}`);
+                }
+
+                closeErrorModal();
+                refreshRetryList();
+            } catch (e) {
+                console.error('Retry failed:', e);
+                alert('重试失败: ' + e.message);
+            }
+        }
+
+        function closeErrorModal() {
+            document.getElementById('error-detail-modal').classList.remove('show');
+        }
+
+        window.addEventListener('load', async () => {
+            const savedCode = localStorage.getItem('creatorCode');
+            if (savedCode) {
+                // Re-verify the saved code
+                try {
+                    const response = await fetch('/api/v1/admin/verify-code?code=' + encodeURIComponent(savedCode), {
+                        method: 'POST'
+                    });
+
+                    if (!response.ok) {
+                        console.error('Verify saved code failed:', response.status);
+                        // Don't clear the code on network error, just log it
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    if (data.valid) {
+                        creatorCodeVerified = true;
+                        const statusEl = document.getElementById('creator-status');
+                        const retryCard = document.getElementById('retry-management-card');
+                        if (statusEl) statusEl.innerHTML = '<span style="color:#10b981;">✓ 创作者模式已启用</span>';
+                        if (retryCard) retryCard.style.display = 'block';
+                    } else {
+                        // Code is no longer valid, clear it
+                        localStorage.removeItem('creatorCode');
+                        const statusEl = document.getElementById('creator-status');
+                        if (statusEl) statusEl.innerHTML = '<span style="color:#ef4444;">✗ 创作者代码已失效，请重新验证</span>';
+                    }
+                } catch (e) {
+                    console.error('Failed to verify saved creator code:', e);
+                    // Don't clear the code on network error
+                }
+            }
+        });
+
+        // ========== Dev Fetch SSE Functions ==========
+        let fetchEventSource = null;
+        let liveArticlesCount = 0;
+
+        async function startDevFetch() {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) {
+                showToast('请先验证创作者代码');
+                return;
+            }
+
+            const btn = document.getElementById('dev-fetch-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '抓取中...';
+            }
+
+            // 显示进度面板
+            const progressContainer = document.getElementById('fetch-progress-container');
+            const sourceStatus = document.getElementById('source-status');
+            if (progressContainer) progressContainer.style.display = 'block';
+            if (sourceStatus) sourceStatus.style.display = 'grid';
+
+            // 重置状态
+            resetFetchUI();
+
+            try {
+                // 1. 启动 fetch 任务
+                const resp = await fetch('/api/v1/admin/fetch-news?force=true', {
+                    method: 'POST',
+                    headers: { 'X-Creator-Code': code }
+                });
+
+                if (!resp.ok) {
+                    const errorText = await resp.text();
+                    throw new Error(`HTTP ${resp.status}: ${errorText.slice(0, 100)}`);
+                }
+
+                const data = await resp.json();
+
+                if (!data.task_id) {
+                    throw new Error(data.detail || data.message || '启动失败');
+                }
+
+                // 2. 订阅 SSE 流
+                fetchEventSource = new EventSource(`/api/v1/admin/fetch-stream/${data.task_id}`);
+
+                fetchEventSource.onmessage = (event) => {
+                    try {
+                        const eventData = JSON.parse(event.data);
+                        handleFetchEvent(eventData);
+                    } catch (e) {
+                        console.error('Parse SSE error:', e);
+                    }
+                };
+
+                fetchEventSource.onerror = (e) => {
+                    console.error('SSE error:', e);
+                    if (fetchEventSource) {
+                        fetchEventSource.close();
+                        fetchEventSource = null;
+                    }
+                    // 恢复按钮状态
+                    finishFetch(false, '连接中断');
+                };
+
+            } catch (e) {
+                console.error('Start fetch error:', e);
+                finishFetch(false, e.message);
+            }
+        }
+
+        function handleFetchEvent(event) {
+            addFetchLog(event);
+
+            switch (event.type) {
+                case 'start':
+                    updateFetchStatus(event.message, 5);
+                    // 清空列表，准备接收新数据
+                    const list = document.getElementById('live-articles-list');
+                    if (list) list.innerHTML = '';
+                    liveArticlesData = [];
+                    liveArticlesCount = 0;
+                    const countEl = document.getElementById('live-articles-count');
+                    if (countEl) countEl.textContent = '0';
+                    break;
+
+                case 'source_start':
+                    updateSourceStatus(event.source, 'loading');
+                    updateFetchStatus(event.message, getProgressForSource(event.source));
+                    break;
+
+                case 'source_complete':
+                    updateSourceStatus(event.source, 'done', event.count);
+                    if (event.articles) {
+                        event.articles.forEach(a => addLiveArticle(a.title, a.source || event.source, 'fetched', 'pending', 'pending', 'pending'));
+                    }
+                    break;
+
+                case 'source_error':
+                    updateSourceStatus(event.source, 'error');
+                    break;
+
+                case 'processing':
+                    updateFetchStatus(event.message, 70);
+                    break;
+
+                case 'article_saved':
+                    addLiveArticle(event.title, event.source, event.status, event.scrape_status || 'pending', event.title_status || 'pending', event.content_status || 'pending');
+                    break;
+
+                case 'batch_start':
+                    // 批量处理开始，更新所有文章的对应状态为 loading
+                    updateAllArticleStatus(event.batch_type, 'loading');
+                    updateFetchStatus(event.message || `正在${event.batch_type === 'title_translation' ? '翻译标题' : '精炼内容'}...`, event.batch_type === 'title_translation' ? 75 : 85);
+                    break;
+
+                case 'batch_complete':
+                    // 批量处理完成，更新所有文章的对应状态
+                    updateAllArticleStatus(event.batch_type, 'success', event.success || 0);
+                    break;
+
+                case 'complete':
+                    updateFetchStatus(`完成！新增 ${event.new_count} 条，重复 ${event.duplicate_count} 条`, 100);
+                    finishFetch(true);
+                    break;
+
+                case 'error':
+                    finishFetch(false, event.message);
+                    break;
+
+                case 'heartbeat':
+                    // 保持连接
+                    break;
+            }
+        }
+
+        // 更新所有文章的指定状态
+        function updateAllArticleStatus(batchType, status, successCount) {
+            // 根据批处理类型确定要更新的状态字段
+            let statusField;
+            if (batchType === 'scraping') statusField = 'scrapeStatus';
+            else if (batchType === 'title_translation') statusField = 'titleStatus';
+            else statusField = 'contentStatus';
+
+            // 更新数据
+            liveArticlesData.forEach(article => {
+                article[statusField] = status;
+            });
+
+            // 重新渲染列表
+            renderLiveArticlesListFiltered();
+        }
+
+        function updateSourceStatus(source, status, count) {
+            const item = document.querySelector(`.source-item[data-source="${source}"]`);
+            if (!item) return;
+
+            const icon = item.querySelector('.source-icon');
+            const countEl = item.querySelector('.source-count');
+            if (!icon || !countEl) return;
+
+            if (status === 'loading') {
+                icon.textContent = '🔄';
+                icon.classList.add('spinning');
+            } else if (status === 'done') {
+                icon.textContent = '✅';
+                icon.classList.remove('spinning');
+                countEl.textContent = count + ' 条';
+            } else if (status === 'error') {
+                icon.textContent = '❌';
+                icon.classList.remove('spinning');
+                countEl.textContent = '失败';
+            }
+        }
+
+        function updateFetchStatus(message, progress) {
+            const statusText = document.getElementById('fetch-status-text');
+            const progressBar = document.getElementById('fetch-progress-bar');
+            if (statusText) statusText.textContent = message;
+            if (progressBar) progressBar.style.width = progress + '%';
+        }
+
+        // 存储实时文章数据用于筛选
+        let liveArticlesData = [];
+        let currentLiveFilter = 'all';
+
+        function filterLiveList(filter) {
+            currentLiveFilter = filter;
+            // 更新按钮状态
+            document.querySelectorAll('.live-filter-btn').forEach(btn => {
+                if (btn.dataset.filter === filter) {
+                    btn.style.background = 'var(--primary)';
+                    btn.style.color = '#fff';
+                    btn.style.border = 'none';
+                } else {
+                    btn.style.background = 'var(--bg)';
+                    btn.style.color = 'var(--text2)';
+                    btn.style.border = '1px solid var(--border)';
+                }
+            });
+
+            // 重新渲染
+            renderLiveArticlesListFiltered();
+        }
+
+        // 根据当前筛选条件渲染列表
+        function renderLiveArticlesListFiltered() {
+            const list = document.getElementById('live-articles-list');
+            if (!list) return;
+
+            const filtered = currentLiveFilter === 'all' ? liveArticlesData : liveArticlesData.filter(a => {
+                return a.scrapeStatus === 'failed' || a.titleStatus === 'failed' || a.contentStatus === 'failed';
+            });
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);font-size:12px;">暂无数据</div>';
+                return;
+            }
+
+            const getStatusDot = (s) => {
+                if (s === 'success' || s === 'ready') return '<div class="status-dot success">✓</div>';
+                if (s === 'failed') return '<div class="status-dot failed">✗</div>';
+                if (s === 'blocked') return '<div class="status-dot blocked">⏸</div>';
+                if (s === 'loading' || s === 'generating') return '<div class="status-dot loading"></div>';
+                return '<div class="status-dot pending">-</div>';
+            };
+
+            list.innerHTML = filtered.map(article => {
+                const hasFailed = article.scrapeStatus === 'failed' || article.titleStatus === 'failed' || article.contentStatus === 'failed' || article.contentStatus === 'blocked';
+                return `
+                    <div class="live-item ${hasFailed ? 'has-failed' : ''}">
+                        <div class="live-item-title">${(article.title || '无标题').slice(0, 40)}...</div>
+                        <div class="live-item-statuses">
+                            <div title="原文抓取">${getStatusDot(article.scrapeStatus)}</div>
+                            <div title="标题翻译">${getStatusDot(article.titleStatus)}</div>
+                            <div title="内容精炼">${getStatusDot(article.contentStatus)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addLiveArticle(title, source, status, scrapeStatus, titleStatus, contentStatus) {
+            const countEl = document.getElementById('live-articles-count');
+
+            liveArticlesCount++;
+            if (countEl) countEl.textContent = liveArticlesCount;
+
+            // 存储数据（不再存储html，动态渲染）
+            liveArticlesData.unshift({ title, source, status, scrapeStatus, titleStatus, contentStatus });
+
+            // 重新渲染列表（根据当前筛选条件）
+            renderLiveArticlesListFiltered();
+        }
+
+        function addFetchLog(event) {
+            const log = document.getElementById('fetch-log');
+            if (!log) return;
+
+            const time = new Date().toLocaleTimeString();
+            const color = event.type === 'error' ? '#ef4444' : event.type === 'complete' ? '#10b981' : 'var(--text2)';
+            log.innerHTML += `<div style="color:${color}">[${time}] ${event.type}: ${JSON.stringify(event).slice(0, 100)}...</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function finishFetch(success, errorMsg) {
+            const btn = document.getElementById('dev-fetch-btn');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '开始抓取';
+            }
+
+            const icon = document.getElementById('fetch-status-icon');
+            if (icon) {
+                icon.classList.remove('spinning');
+                icon.textContent = success ? '✅' : '❌';
+            }
+
+            if (!success && errorMsg) {
+                const statusText = document.getElementById('fetch-status-text');
+                if (statusText) statusText.textContent = '错误: ' + errorMsg;
+            }
+
+            if (fetchEventSource) {
+                fetchEventSource.close();
+                fetchEventSource = null;
+            }
+
+            // 刷新数据
+            if (success) {
+                refreshRetryList();
+                loadFetchHistory();
+                loadNews(); // 刷新首页新闻列表
+            }
+        }
+
+        function resetFetchUI() {
+            liveArticlesCount = 0;
+            liveArticlesData = [];
+            const liveCount = document.getElementById('live-articles-count');
+            const liveList = document.getElementById('live-articles-list');
+            const fetchLog = document.getElementById('fetch-log');
+            const progressBar = document.getElementById('fetch-progress-bar');
+            const statusIcon = document.getElementById('fetch-status-icon');
+            const statusText = document.getElementById('fetch-status-text');
+
+            if (liveCount) liveCount.textContent = '0';
+            if (liveList) liveList.innerHTML = '';
+            if (fetchLog) fetchLog.innerHTML = '';
+            if (progressBar) progressBar.style.width = '0%';
+            if (statusIcon) {
+                statusIcon.textContent = '🔄';
+                statusIcon.classList.add('spinning');
+            }
+            if (statusText) statusText.textContent = '准备中...';
+
+            // 重置源状态
+            document.querySelectorAll('.source-item').forEach(item => {
+                const icon = item.querySelector('.source-icon');
+                const count = item.querySelector('.source-count');
+                if (icon) {
+                    icon.textContent = '⏳';
+                    icon.classList.remove('spinning');
+                }
+                if (count) count.textContent = '-';
+            });
+        }
+
+        function toggleFetchLog() {
+            const log = document.getElementById('fetch-log');
+            const btn = document.getElementById('log-toggle-btn');
+            if (!log || !btn) return;
+
+            if (log.style.display === 'none') {
+                log.style.display = 'block';
+                btn.textContent = '收起';
+            } else {
+                log.style.display = 'none';
+                btn.textContent = '展开';
+            }
+        }
+
+        function getProgressForSource(source) {
+            const map = { hackernews: 15, reddit: 30, rss: 45, newsapi: 60 };
+            return map[source] || 50;
         }
 
         init();

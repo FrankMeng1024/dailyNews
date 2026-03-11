@@ -36,4 +36,6 @@ def get_db():
 
 def init_db():
     """Initialize database tables"""
+    # Import all models to ensure they're registered with Base
+    from app.models import news, audio, settings, retry_history, system_config
     Base.metadata.create_all(bind=engine)

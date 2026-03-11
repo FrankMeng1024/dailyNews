@@ -27,6 +27,7 @@ async def get_settings(
             user_id=current_user.id,
             fetch_hours=["8", "12", "18"],
             importance_threshold=0.5,
+            quality_level="standard",  # NEW: default to standard quality
             theme="system",
             audio_language="zh"
         )
@@ -77,4 +78,42 @@ async def get_available_fetch_hours():
     return {
         "hours": list(range(24)),
         "description": "Select hours for automatic news fetching (Beijing time)"
+    }
+
+
+@router.get("/quality-levels")
+async def get_quality_levels(db: Session = Depends(get_db)):
+    """
+    Get available quality levels with names, descriptions, and current thresholds
+    """
+    from app.services.quality_threshold_manager import QualityThresholdManager
+    from app.config_sources.quality_levels import (
+        QUALITY_LEVEL_NAMES,
+        QUALITY_LEVEL_DESCRIPTIONS,
+        QualityLevel
+    )
+
+    thresholds = QualityThresholdManager.get_thresholds(db)
+    stats = QualityThresholdManager.get_score_statistics(db)
+
+    levels = []
+    for level in [QualityLevel.PREMIUM, QualityLevel.STANDARD, QualityLevel.ALL]:
+        levels.append({
+            "value": level.value,
+            "name": QUALITY_LEVEL_NAMES[level],
+            "description": QUALITY_LEVEL_DESCRIPTIONS[level],
+            "threshold": thresholds[level],
+            "article_count": stats["distribution"][level]
+        })
+
+    return {
+        "levels": levels,
+        "statistics": {
+            "total_articles": stats["total"],
+            "score_range": {
+                "min": stats["min_score"],
+                "max": stats["max_score"],
+                "avg": stats["avg_score"]
+            }
+        }
     }

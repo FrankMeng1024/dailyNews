@@ -1,24 +1,7 @@
 from pydantic import BaseModel, field_serializer
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
-
-
-def to_beijing_time(dt: datetime) -> str:
-    """Convert UTC datetime to Beijing time string (HH:MM:SS)"""
-    if dt is None:
-        return ""
-    # Add 8 hours for Beijing timezone
-    beijing_dt = dt + timedelta(hours=8)
-    return beijing_dt.strftime("%H:%M:%S")
-
-
-def to_beijing_datetime(dt: datetime) -> str:
-    """Convert UTC datetime to Beijing datetime string"""
-    if dt is None:
-        return ""
-    beijing_dt = dt + timedelta(hours=8)
-    return beijing_dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 class NewsBase(BaseModel):
@@ -54,18 +37,23 @@ class NewsResponse(BaseModel):
     category: str
     created_at: datetime
 
+    # New fields for content type and verification
+    source_type: str = "news"  # news/blog/paper/discussion/podcast/video
+    content_format: str = "text"  # text/audio/video/mixed
+    media_duration: Optional[int] = None  # Duration in seconds for audio/video
+    is_verified: bool = False  # Whether source is verified
+    ai_relevance_score: Optional[float] = None  # AI relevance score (0-1)
+
     @field_serializer('published_at')
     def serialize_published_at(self, v: datetime) -> str:
         if v:
-            beijing_dt = v + timedelta(hours=8)
-            return beijing_dt.isoformat()
+            return v.isoformat()
         return ""
 
     @field_serializer('created_at')
     def serialize_created_at(self, v: datetime) -> str:
         if v:
-            beijing_dt = v + timedelta(hours=8)
-            return beijing_dt.isoformat()
+            return v.isoformat()
         return ""
 
     class Config:

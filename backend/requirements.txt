@@ -28,6 +28,10 @@ apscheduler==3.10.4
 # Audio processing
 pydub==0.25.1
 
+# RSS and web scraping
+feedparser==6.0.10
+beautifulsoup4==4.12.2
+
 # Utilities
 python-dotenv==1.0.0
 pytz==2023.3

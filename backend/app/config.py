@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # Timezone
     TIMEZONE: str = "Asia/Shanghai"
 
+    # Creator Code
+    CREATOR_CODE: str = "Mzm920313@950824"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

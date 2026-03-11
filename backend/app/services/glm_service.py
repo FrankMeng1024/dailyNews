@@ -1,10 +1,14 @@
 import httpx
 import json
+import logging
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.news import News
+from app.services.config_service import ConfigService, DEFAULT_CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 class GLMService:
@@ -22,26 +26,30 @@ class GLMService:
             "Content-Type": "application/json"
         }
 
-    async def _call_api(self, messages: List[Dict[str, str]], max_tokens: int = 1024, model: str = None) -> str:
+    async def _call_api(self, messages: List[Dict[str, str]], max_tokens: int = 1024, model: str = None, timeout: float = None) -> str:
         """
         Call GLM API with messages
 
         Args:
             messages: List of message dicts with role and content
             max_tokens: Maximum tokens in response
-            model: Model to use (defaults to glm-4.7-flash - free model)
+            model: Model to use (defaults to glm-4-flash - free model)
+            timeout: Request timeout in seconds (defaults to config value)
 
         Returns:
             Response content string
         """
+        # Use config timeout if not specified
+        api_timeout = timeout or DEFAULT_CONFIG["glm_api_timeout"]
+
         payload = {
-            "model": model or "glm-4.7-flash",  # Use latest free model
+            "model": model or "glm-4-flash",  # Use latest free model
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": 0.7
         }
 
-        async with httpx.AsyncClient(timeout=1800.0) as client:
+        async with httpx.AsyncClient(timeout=float(api_timeout)) as client:
             response = await client.post(
                 self.api_url,
                 headers=self._get_headers(),
@@ -181,6 +189,12 @@ Summary:"""
 
         prompt = f"""将以下英文新闻标题翻译成简洁的中文，保持新闻标题风格。
 
+翻译要求：
+1. 保留专有名词的英文原文（如：GPT-4、Claude、OpenAI、Anthropic、LLaMA等）
+2. 技术术语使用通用中文翻译（如：AI、机器学习、深度学习等）
+3. 保持标题简洁有力，符合中文新闻标题习惯
+4. 不要添加任何解释或注释
+
 {titles_text}
 
 输出格式（JSON数组）：
@@ -189,20 +203,161 @@ Summary:"""
 只输出JSON数组，不要其他内容。"""
 
         messages = [
-            {"role": "system", "content": "你是一位专业的新闻翻译。只输出JSON数组。"},
+            {"role": "system", "content": "你是一位专业的科技新闻翻译，擅长AI领域内容。只输出JSON数组。"},
             {"role": "user", "content": prompt}
         ]
 
         try:
+            logger.info(f"[Translation] Translating {len(titles)} titles...")
+            logger.debug(f"[Translation] Request: {json.dumps(messages, ensure_ascii=False)[:200]}...")
+
             response = await self._call_api(messages, max_tokens=1024)
+            logger.debug(f"[Translation] Raw response: {response[:200]}...")
+
             response = response.strip()
             if response.startswith("```"):
                 response = response.split("```")[1]
                 if response.startswith("json"):
                     response = response[4:]
-            return json.loads(response)
+
+            translated = json.loads(response)
+
+            # 验证结果
+            if len(translated) != len(titles):
+                logger.warning(f"[Translation] Length mismatch: {len(translated)} != {len(titles)}")
+
+            # 输出对比
+            for i, (orig, trans) in enumerate(zip(titles, translated)):
+                if trans != orig:
+                    logger.info(f"[Translation] ✓ {orig[:50]} → {trans}")
+                else:
+                    logger.warning(f"[Translation] ✗ Unchanged: {orig[:50]}")
+
+            logger.info(f"成功翻译 {len(translated)}/{len(titles)} 个标题")
+            return translated
+
+        except json.JSONDecodeError as e:
+            logger.error(f"[Translation] JSON parse error: {e}")
+            logger.error(f"[Translation] Response was: {response[:500]}")
+            logger.warning("标题翻译失败: JSON解析错误")
+            return titles
+        except httpx.TimeoutException as e:
+            logger.error(f"[Translation] Timeout: {e}")
+            logger.warning("标题翻译失败: 超时")
+            return titles
+        except httpx.HTTPStatusError as e:
+            logger.error(f"[Translation] HTTP {e.response.status_code}: {e.response.text[:200]}")
+            logger.warning(f"标题翻译失败: HTTP {e.response.status_code}")
+            return titles
         except Exception as e:
+            logger.error(f"[Translation] Unexpected error: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            logger.warning(f"标题翻译失败: {e}")
             return titles  # Return originals on error
+
+    async def translate_titles_with_context(
+        self,
+        news_items: List[Dict[str, str]]
+    ) -> List[str]:
+        """
+        Translate titles with article context for better understanding
+
+        Args:
+            news_items: List of dicts with 'title' and 'content' keys
+
+        Returns:
+            List of Chinese translated titles
+        """
+        if not news_items:
+            return []
+
+        # 构建提示词
+        news_text = []
+        for i, item in enumerate(news_items):
+            title = item.get("title", "")
+            content = item.get("content", "")[:800]  # 增加内容长度以获得更好的理解
+            news_text.append(f"新闻{i+1}:\n原标题: {title}\n文章内容: {content}\n")
+
+        prompt = f"""你是一位顶级科技媒体的资深编辑，擅长撰写吸引眼球的AI新闻标题。
+
+你的任务是为以下AI新闻创作高质量的中文标题。
+
+## 标题创作原则
+
+1. **理解核心价值**: 深入阅读文章内容，找出最有新闻价值的点
+2. **提炼关键信息**: 突出"谁做了什么"、"有什么突破"、"带来什么影响"
+3. **吸引读者兴趣**: 使用有冲击力的动词和表达，让读者想点击阅读
+4. **符合中文习惯**: 使用地道的中文表达，避免翻译腔
+
+## 标题风格要求
+
+- 长度: 15-30个字符
+- 保留英文专有名词: GPT-4、Claude、OpenAI、Anthropic、Google、Meta等
+- 避免: "关于"、"浅谈"、"论"等学术化表达
+- 推荐: 使用"发布"、"推出"、"突破"、"首次"、"重磅"等新闻动词
+- 可以适当使用冒号分隔主副标题
+
+## 优秀标题示例
+
+- "OpenAI发布GPT-5：推理能力超越人类专家"
+- "Claude 3.5登顶编程榜单：代码能力碾压GPT-4"
+- "重磅！Google开源最强AI模型Gemma 2"
+- "Meta发布Llama 3：开源模型首次挑战闭源巨头"
+
+## 待处理新闻
+
+{chr(10).join(news_text)}
+
+## 输出要求
+
+输出JSON数组，每个元素是对应新闻的中文标题:
+["标题1", "标题2", ...]
+
+只输出JSON数组，不要任何解释。"""
+
+        messages = [
+            {"role": "system", "content": "你是顶级科技媒体的资深编辑，专注AI领域，擅长撰写高质量新闻标题。只输出JSON数组。"},
+            {"role": "user", "content": prompt}
+        ]
+
+        try:
+            logger.info(f"[ContextTranslation] Translating {len(news_items)} titles with context...")
+
+            response = await self._call_api(messages, max_tokens=2048)
+            response = response.strip()
+
+            # 清理markdown代码块
+            if response.startswith("```"):
+                response = response.split("```")[1]
+                if response.startswith("json"):
+                    response = response[4:]
+
+            translated = json.loads(response)
+
+            # 输出对比
+            for i, (item, trans) in enumerate(zip(news_items, translated)):
+                if trans != item['title']:
+                    logger.info(f"[ContextTranslation] ✓ {item['title'][:40]} → {trans}")
+                else:
+                    logger.warning(f"[ContextTranslation] ✗ Unchanged: {item['title'][:40]}")
+
+            logger.info(f"成功生成 {len(translated)}/{len(news_items)} 个中文标题")
+            return translated
+
+        except json.JSONDecodeError as e:
+            logger.error(f"[ContextTranslation] JSON parse error: {e}")
+            logger.error(f"[ContextTranslation] Response was: {response[:500]}")
+            logger.warning("上下文翻译失败: JSON解析错误，降级到简单翻译")
+            # 降级到简单翻译
+            return await self.translate_titles_batch([item["title"] for item in news_items])
+        except Exception as e:
+            logger.error(f"[ContextTranslation] Error: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            logger.warning(f"上下文翻译失败: {e}，降级到简单翻译")
+            # 降级到简单翻译
+            return await self.translate_titles_batch([item["title"] for item in news_items])
 
     async def generate_dialogue_script(
         self,
@@ -223,9 +378,6 @@ Summary:"""
         Returns:
             List of dialogue turns with speaker and text
         """
-        import logging
-        logger = logging.getLogger(__name__)
-
         # Use custom names or defaults
         female_name = host_female_name or "小雅"
         male_name = host_male_name or "小明"
