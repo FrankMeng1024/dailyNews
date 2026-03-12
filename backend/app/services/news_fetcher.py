@@ -137,6 +137,32 @@ class NewsFetcher:
         Returns:
             Dict with statistics
         """
+        # Load dev config for fetch limit
+        try:
+            import sys
+            import os
+            # Add parent directory to path for dev_config
+            news_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            if news_root not in sys.path:
+                sys.path.insert(0, news_root)
+            from dev_config import FETCH_LIMIT
+        except ImportError:
+            FETCH_LIMIT = -1  # Default: no limit
+
+        # Calculate per-source limit
+        if FETCH_LIMIT == -1:
+            rss_limit = None  # No limit
+            hn_limit = 15
+            reddit_limit = 15
+            newsapi_limit = 30
+        else:
+            per_source = max(1, FETCH_LIMIT // 4)
+            rss_limit = per_source
+            hn_limit = per_source
+            reddit_limit = per_source
+            newsapi_limit = per_source
+            logger.info(f"[DEV] Scheduled fetch limit: {FETCH_LIMIT}, per source: {per_source}")
+
         coordinator = FetchCoordinator(db)
 
         # Create fetch history record
@@ -164,12 +190,13 @@ class NewsFetcher:
             if fetch_type in ["all", "rss"]:
                 rss_articles = await self.fetch_rss_feeds(
                     since=time_window['overlap_start'],
-                    until=time_window['end']
+                    until=time_window['end'],
+                    limit_per_source=rss_limit
                 )
                 all_articles.extend(rss_articles)
 
             if fetch_type in ["all", "newsapi"]:
-                newsapi_articles = await self.fetch_newsapi_ai(page_size=30)
+                newsapi_articles = await self.fetch_newsapi_ai(page_size=newsapi_limit)
                 # Filter by time window
                 newsapi_articles = coordinator.filter_by_time_window(
                     newsapi_articles,
@@ -179,8 +206,8 @@ class NewsFetcher:
 
             # Also fetch HN and Reddit (always included in "all")
             if fetch_type == "all":
-                hn_articles = await self.fetch_hackernews_ai(limit=15)
-                reddit_articles = await self.fetch_reddit_ai(limit=15)
+                hn_articles = await self.fetch_hackernews_ai(limit=hn_limit)
+                reddit_articles = await self.fetch_reddit_ai(limit=reddit_limit)
 
                 # Filter by time window
                 hn_articles = coordinator.filter_by_time_window(hn_articles, time_window)
@@ -276,7 +303,7 @@ class NewsFetcher:
 
         scraped_contents = []
         image_urls = []
-        batch_size = 5
+        batch_size = 20  # Increased for better parallelism
 
         # Scrape content
         for i in range(0, len(scrape_tasks), batch_size):
@@ -469,73 +496,69 @@ class NewsFetcher:
         articles = []
         scrape_timeout = DEFAULT_CONFIG["scrape_timeout"]
 
-        for source_id, source_info in VERIFIED_AI_SOURCES.items():
-            # Skip sources without RSS URL (API-based sources)
-            if "rss_url" not in source_info:
-                continue
+        # Collect RSS sources
+        rss_sources = [
+            (source_id, source_info)
+            for source_id, source_info in VERIFIED_AI_SOURCES.items()
+            if "rss_url" in source_info
+        ]
 
-            # Get tier-based limit if not specified
-            source_authority = get_source_authority(source_info["name"])
-            tier = source_authority['tier']
-            max_articles = limit_per_source if limit_per_source is not None else get_fetch_limit(tier)
+        if not rss_sources:
+            return []
 
-            try:
-                logger.info(f"Fetching RSS from {source_info['name']} (Tier {tier}, limit={max_articles})...")
+        # Parallel fetch all RSS feeds
+        async with httpx.AsyncClient(timeout=float(scrape_timeout), follow_redirects=True) as client:
+            tasks = [client.get(source_info["rss_url"]) for _, source_info in rss_sources]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
 
-                # Fetch RSS feed
-                async with httpx.AsyncClient(timeout=float(scrape_timeout), follow_redirects=True) as client:
-                    response = await client.get(source_info["rss_url"])
+            for (source_id, source_info), response in zip(rss_sources, responses):
+                source_authority = get_source_authority(source_info["name"])
+                tier = source_authority['tier']
+                max_articles = limit_per_source if limit_per_source is not None else get_fetch_limit(tier)
 
-                    if response.status_code != 200:
-                        logger.warning(f"Failed to fetch {source_info['name']}: HTTP {response.status_code}")
-                        continue
+                if isinstance(response, Exception):
+                    logger.warning(f"Failed to fetch {source_info['name']}: {response}")
+                    continue
 
-                    # Parse RSS feed
+                if response.status_code != 200:
+                    logger.warning(f"Failed to fetch {source_info['name']}: HTTP {response.status_code}")
+                    continue
+
+                try:
                     feed = feedparser.parse(response.text)
-
-                    # 验证 RSS feed
                     if not self._validate_rss_feed(feed, source_info['name']):
                         continue
-
                     if not feed.entries:
                         continue
 
-                    # Process entries with time filtering
                     source_articles = []
                     for entry in feed.entries:
-                        # Extract published date (timezone-aware)
                         published_at = None
                         if hasattr(entry, 'published_parsed') and entry.published_parsed:
                             try:
                                 timestamp = mktime(entry.published_parsed)
                                 published_at = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-                            except (ValueError, OverflowError) as e:
-                                logger.warning(f"Invalid published_parsed for {source_info['name']}: {e}")
+                            except (ValueError, OverflowError):
                                 published_at = datetime.now(timezone.utc)
                         elif hasattr(entry, 'updated_parsed') and entry.updated_parsed:
                             try:
                                 timestamp = mktime(entry.updated_parsed)
                                 published_at = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-                            except (ValueError, OverflowError) as e:
-                                logger.warning(f"Invalid updated_parsed for {source_info['name']}: {e}")
+                            except (ValueError, OverflowError):
                                 published_at = datetime.now(timezone.utc)
                         else:
                             published_at = datetime.now(timezone.utc)
 
-                        # Time-window filtering
                         if since and published_at < since:
                             continue
                         if until and published_at > until:
                             continue
 
-                        # Extract content
                         description = ""
                         if hasattr(entry, 'summary'):
                             description = entry.summary
                         elif hasattr(entry, 'description'):
                             description = entry.description
-
-                        # Clean HTML from description
                         if description:
                             soup = BeautifulSoup(description, 'html.parser')
                             description = soup.get_text(strip=True)
@@ -549,33 +572,122 @@ class NewsFetcher:
                             "description": description,
                             "is_verified": source_info["verified"],
                             "author": entry.author if hasattr(entry, 'author') else None,
-                            "published_at": published_at  # Keep datetime object
+                            "published_at": published_at
                         }
-
                         source_articles.append(article)
-
-                        # Check tier-based limit
                         if max_articles and len(source_articles) >= max_articles:
                             break
 
-                    # Add to main list
                     articles.extend(source_articles)
                     logger.info(f"  ✓ Fetched {len(source_articles)} articles from {source_info['name']}")
 
-            except httpx.TimeoutException:
-                logger.warning(f"Timeout fetching RSS from {source_info['name']}")
-                continue
-            except httpx.RequestError as e:
-                logger.warning(f"Request error fetching {source_info['name']}: {e}")
-                continue
-            except Exception as e:
-                logger.error(f"Error fetching {source_info['name']}: {type(e).__name__}: {e}")
-                continue
+                except Exception as e:
+                    logger.error(f"Error parsing {source_info['name']}: {type(e).__name__}: {e}")
+                    continue
 
         logger.info(f"Total RSS articles fetched: {len(articles)}")
         return articles
 
     # ========== Web Scraping ==========
+
+    def _is_valid_content(self, content: str) -> bool:
+        """检查抓取的内容是否有效（不是错误页面、省略号等垃圾内容）"""
+        if not content or len(content) < 100:
+            return False
+
+        content_lower = content.lower()
+
+        # 检查错误页面特征
+        error_patterns = ['404', 'not found', 'page not found', 'error', 'forbidden', '403', '500',
+                          'access denied', 'unauthorized', 'login required', 'sign in to',
+                          'please enable javascript', 'enable cookies']
+        # 只检查开头部分，避免误判正文中的这些词
+        first_500 = content_lower[:500]
+        error_count = sum(1 for p in error_patterns if p in first_500)
+        if error_count >= 2:  # 多个错误特征
+            return False
+
+        # 检查是否大部分是省略号或特殊字符
+        ellipsis_count = content.count('...') + content.count('…') + content.count('...')
+        if ellipsis_count > 10:
+            return False
+
+        # 检查内容多样性（不是重复的模板文本）
+        lines = [l.strip() for l in content.split('\n') if l.strip()]
+        if len(lines) < 3:
+            return False
+
+        # 检查是否有足够的实际文本（不只是短句）
+        long_lines = [l for l in lines if len(l) > 50]
+        if len(long_lines) < 2:
+            return False
+
+        return True
+
+    async def _scrape_github_content(self, url: str) -> Optional[str]:
+        """GitHub 页面特殊处理
+
+        GitHub 使用 JS 渲染，普通抓取无法获取完整内容。
+        策略：
+        1. 如果是 blob 页面（代码文件），转换为 raw URL
+        2. 如果是仓库主页，尝试获取 README
+        3. 如果是 issue/PR，提取描述内容
+        """
+        scrape_timeout = DEFAULT_CONFIG["scrape_timeout"]
+
+        try:
+            async with httpx.AsyncClient(timeout=float(scrape_timeout), follow_redirects=True) as client:
+                # 策略 1: blob 页面 -> raw 内容
+                if '/blob/' in url:
+                    # https://github.com/user/repo/blob/main/file.md
+                    # -> https://raw.githubusercontent.com/user/repo/main/file.md
+                    raw_url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
+                    resp = await client.get(raw_url)
+                    if resp.status_code == 200:
+                        content = resp.text
+                        # 如果是 markdown，保留原文
+                        if url.endswith('.md') or url.endswith('.markdown'):
+                            return content[:30000] if len(content) > 30000 else content
+                        # 其他文件类型，可能是代码
+                        return content[:10000] if len(content) > 10000 else content
+
+                # 策略 2: 仓库主页 -> README
+                # https://github.com/user/repo -> 尝试获取 README
+                parts = url.rstrip('/').split('/')
+                if len(parts) >= 5 and parts[2] == 'github.com':
+                    user = parts[3]
+                    repo = parts[4]
+                    # 尝试常见的 README 文件名
+                    readme_urls = [
+                        f"https://raw.githubusercontent.com/{user}/{repo}/main/README.md",
+                        f"https://raw.githubusercontent.com/{user}/{repo}/master/README.md",
+                        f"https://raw.githubusercontent.com/{user}/{repo}/main/readme.md",
+                        f"https://raw.githubusercontent.com/{user}/{repo}/master/readme.md",
+                    ]
+                    for readme_url in readme_urls:
+                        resp = await client.get(readme_url)
+                        if resp.status_code == 200 and len(resp.text) > 100:
+                            return resp.text[:30000] if len(resp.text) > 30000 else resp.text
+
+                # 策略 3: issue/PR 页面 -> 提取描述
+                if '/issues/' in url or '/pull/' in url:
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                        "Accept": "text/html,application/xhtml+xml"
+                    }
+                    resp = await client.get(url, headers=headers)
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, 'html.parser')
+                        # GitHub issue/PR 的描述在 .comment-body 中
+                        comment_body = soup.select_one('.comment-body')
+                        if comment_body:
+                            return comment_body.get_text(strip=True)
+
+                return None
+
+        except Exception as e:
+            logger.warning(f"GitHub scrape error for {url[:50]}: {e}")
+            return None
 
     async def scrape_article_content(self, url: str, db: Session = None) -> Optional[str]:
         """Scrape full article content from URL
@@ -587,28 +699,32 @@ class NewsFetcher:
         if not url or url.startswith("https://news.ycombinator.com"):
             return None  # HN discussion pages don't have article content
 
+        # ========== GitHub 特殊处理 ==========
+        if 'github.com' in url:
+            github_content = await self._scrape_github_content(url)
+            if github_content and self._is_valid_content(github_content):
+                return github_content
+            # 如果 GitHub 特殊处理失败，继续尝试普通抓取
+
         # 从配置获取参数
         scrape_timeout = DEFAULT_CONFIG["scrape_timeout"]
-        min_para_len = DEFAULT_CONFIG["min_paragraph_length"]
-        min_fallback_para_len = DEFAULT_CONFIG["min_fallback_paragraph_length"]
-        min_paras_fallback = DEFAULT_CONFIG["min_paragraphs_for_fallback"]
         max_content = DEFAULT_CONFIG["max_content_for_scrape"]
         min_content_len = DEFAULT_CONFIG["min_content_length"]
 
         if db:
             scrape_timeout = ConfigService.get(db, "scrape_timeout", scrape_timeout)
-            min_para_len = ConfigService.get(db, "min_paragraph_length", min_para_len)
-            min_fallback_para_len = ConfigService.get(db, "min_fallback_paragraph_length", min_fallback_para_len)
-            min_paras_fallback = ConfigService.get(db, "min_paragraphs_for_fallback", min_paras_fallback)
             max_content = ConfigService.get(db, "max_content_for_scrape", max_content)
             min_content_len = ConfigService.get(db, "min_content_length", min_content_len)
 
         try:
             async with httpx.AsyncClient(timeout=float(scrape_timeout), follow_redirects=True) as client:
                 headers = {
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                    "Accept": "text/html,application/xhtml+xml",
-                    "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7"
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Cache-Control": "no-cache",
+                    "Pragma": "no-cache",
                 }
                 resp = await client.get(url, headers=headers)
 
@@ -618,56 +734,121 @@ class NewsFetcher:
 
                 soup = BeautifulSoup(resp.text, 'html.parser')
 
-                # Remove unwanted elements
+                # Remove unwanted elements (more comprehensive)
                 for tag in soup.find_all(['script', 'style', 'nav', 'header', 'footer',
-                                          'aside', 'iframe', 'noscript', 'form']):
+                                          'aside', 'iframe', 'noscript', 'form', 'button',
+                                          'input', 'select', 'textarea', 'svg', 'canvas',
+                                          '.sidebar', '.comments', '.related', '.share',
+                                          '.social', '.advertisement', '.ad', '.ads']):
+                    if hasattr(tag, 'decompose'):
+                        tag.decompose()
+
+                # Also remove by class patterns
+                for tag in soup.find_all(class_=lambda x: x and any(
+                    kw in str(x).lower() for kw in ['sidebar', 'comment', 'related', 'share', 'social', 'ad-', 'advertisement', 'promo', 'newsletter', 'subscribe']
+                )):
                     tag.decompose()
 
-                # Try to find article content using common selectors
                 content = None
+
+                # Strategy 1: Extended selectors for article content
                 selectors = [
                     'article',
                     '[role="main"]',
+                    '[role="article"]',
                     '.article-content',
+                    '.article-body',
+                    '.article__content',
+                    '.article__body',
                     '.post-content',
+                    '.post-body',
+                    '.post__content',
                     '.entry-content',
+                    '.entry-body',
                     '.content-body',
                     '.story-body',
+                    '.story-content',
+                    '.blog-content',
+                    '.blog-post',
+                    '.news-content',
+                    '.news-body',
                     'main',
                     '.main-content',
                     '#content',
+                    '#main-content',
+                    '#article-content',
+                    '#post-content',
+                    '.prose',  # Tailwind CSS
+                    '.markdown-body',  # GitHub
+                    '.rich-text',
+                    '[itemprop="articleBody"]',
+                    '[data-article-body]',
+                    '.c-entry-content',  # Verge
+                    '.article-text',
                 ]
 
                 for selector in selectors:
-                    element = soup.select_one(selector)
-                    if element:
-                        # Get all paragraphs
-                        paragraphs = element.find_all('p')
-                        if paragraphs:
-                            texts = []
-                            for p in paragraphs:
-                                text = p.get_text(strip=True)
-                                if len(text) > min_para_len:
-                                    texts.append(text)
-                            if texts:
-                                content = '\n\n'.join(texts)
+                    try:
+                        element = soup.select_one(selector)
+                        if element:
+                            content = self._extract_text_from_element(element)
+                            if content and len(content) >= min_content_len:
                                 break
+                            content = None
+                    except Exception:
+                        continue
 
-                # Fallback: get all paragraphs from body
+                # Strategy 2: Try to find the largest text block
+                if not content:
+                    content = self._find_largest_text_block(soup, min_content_len)
+
+                # Strategy 3: Fallback - get all paragraphs from body
                 if not content:
                     paragraphs = soup.find_all('p')
                     texts = []
                     for p in paragraphs:
                         text = p.get_text(strip=True)
-                        if len(text) > min_fallback_para_len:
+                        # 降低门槛：只要超过 20 字符就收集
+                        if len(text) > 20:
                             texts.append(text)
-                    if len(texts) >= min_paras_fallback:
-                        content = '\n\n'.join(texts[:20])  # Limit to 20 paragraphs
+                    if texts:
+                        content = '\n\n'.join(texts[:30])
 
-                if content and len(content) > min_content_len:
+                # Strategy 4: Try meta description as last resort
+                if not content or len(content) < min_content_len:
+                    meta_desc = soup.find('meta', attrs={'name': 'description'})
+                    if meta_desc and meta_desc.get('content'):
+                        meta_content = meta_desc.get('content', '').strip()
+                        if len(meta_content) >= 100:
+                            # 如果有部分内容，合并
+                            if content:
+                                content = meta_content + "\n\n" + content
+                            else:
+                                content = meta_content
+
+                    # Also try og:description
+                    og_desc = soup.find('meta', attrs={'property': 'og:description'})
+                    if og_desc and og_desc.get('content'):
+                        og_content = og_desc.get('content', '').strip()
+                        if len(og_content) >= 100 and og_content not in (content or ''):
+                            if content:
+                                content = og_content + "\n\n" + content
+                            else:
+                                content = og_content
+
+                if content and len(content) >= min_content_len:
+                    # Clean up content
+                    content = self._clean_content(content)
+
+                    # 验证内容质量
+                    if not self._is_valid_content(content):
+                        logger.warning(f"Scrape got invalid content for {url[:50]}: failed quality check")
+                        return None
+
                     # Truncate if too long
                     return content[:max_content] if len(content) > max_content else content
 
+                logger.warning(f"Scrape got insufficient content for {url[:50]}: {len(content or '')} chars")
                 return None
 
         except httpx.TimeoutException:
@@ -679,6 +860,89 @@ class NewsFetcher:
         except Exception as e:
             logger.error(f"Scrape error for {url[:50]}: {type(e).__name__}: {e}")
             return None
+
+    def _extract_text_from_element(self, element) -> Optional[str]:
+        """Extract text from an element, handling various structures"""
+        texts = []
+
+        # Get paragraphs - 提高门槛避免收集垃圾内容
+        for p in element.find_all('p'):
+            text = p.get_text(strip=True)
+            if len(text) > 40:  # 提高门槛：至少 40 字符
+                texts.append(text)
+
+        # Also get text from divs that look like paragraphs
+        for div in element.find_all('div'):
+            # Skip if has child divs (likely a container)
+            if div.find('div'):
+                continue
+            text = div.get_text(strip=True)
+            if 60 < len(text) < 2000 and text not in texts:  # 提高门槛
+                texts.append(text)
+
+        # Get list items that might be content
+        for li in element.find_all('li'):
+            text = li.get_text(strip=True)
+            if 40 < len(text) < 500 and text not in texts:  # 提高门槛
+                texts.append(text)
+
+        if texts:
+            return '\n\n'.join(texts)
+        return None
+
+    def _find_largest_text_block(self, soup, min_len: int) -> Optional[str]:
+        """Find the largest contiguous text block in the page"""
+        candidates = []
+
+        for tag in soup.find_all(['div', 'section', 'article']):
+            # Skip if too many child divs (likely a layout container)
+            child_divs = tag.find_all('div', recursive=False)
+            if len(child_divs) > 5:
+                continue
+
+            text = tag.get_text(separator='\n', strip=True)
+            # Clean up excessive whitespace
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
+            text = '\n'.join(lines)
+
+            if len(text) >= min_len:
+                # Score by text density (text length / html length)
+                html_len = len(str(tag))
+                if html_len > 0:
+                    density = len(text) / html_len
+                    candidates.append((text, density, len(text)))
+
+        if candidates:
+            # Sort by density * length to find best content block
+            candidates.sort(key=lambda x: x[1] * x[2], reverse=True)
+            return candidates[0][0]
+
+        return None
+
+    def _clean_content(self, content: str) -> str:
+        """Clean up extracted content"""
+        import re
+
+        # Remove excessive newlines
+        content = re.sub(r'\n{3,}', '\n\n', content)
+
+        # Remove lines that are likely navigation/UI text
+        lines = content.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            line = line.strip()
+            # Skip very short lines that are likely UI elements
+            if len(line) < 10:
+                continue
+            # Skip lines that look like navigation
+            if line.lower() in ['home', 'about', 'contact', 'menu', 'search', 'login', 'sign up', 'subscribe']:
+                continue
+            # Skip lines that are just numbers or dates
+            if re.match(r'^[\d\s\-/\.,:]+$', line):
+                continue
+            cleaned_lines.append(line)
+
+        return '\n\n'.join(cleaned_lines)
 
     async def extract_image_url(self, url: str, db: Session = None) -> Optional[str]:
         """Extract featured image URL from article page"""
@@ -762,28 +1026,35 @@ class NewsFetcher:
                 resp = await client.get("https://hacker-news.firebaseio.com/v0/topstories.json")
                 story_ids = resp.json()[:100]
 
+                # Parallel fetch story details (batch of 20)
                 articles = []
-                for story_id in story_ids:
+                batch_size = 20
+                for i in range(0, len(story_ids), batch_size):
                     if len(articles) >= limit:
                         break
+                    batch_ids = story_ids[i:i + batch_size]
+                    tasks = [client.get(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json") for sid in batch_ids]
+                    responses = await asyncio.gather(*tasks, return_exceptions=True)
 
-                    story_resp = await client.get(f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json")
-                    story = story_resp.json()
-
-                    if not story or story.get("type") != "story":
-                        continue
-
-                    title = story.get("title", "").lower()
-                    if any(kw in title for kw in ai_keywords):
-                        articles.append({
-                            "title": story.get("title", ""),
-                            "url": story.get("url", f"https://news.ycombinator.com/item?id={story_id}"),
-                            "source": "Hacker News",
-                            "source_type": "discussion",
-                            "publishedAt": datetime.fromtimestamp(story.get("time", 0), tz=timezone.utc).isoformat(),
-                            "description": f"Score: {story.get('score', 0)} | Comments: {story.get('descendants', 0)}",
-                            "hn_score": story.get("score", 0)
-                        })
+                    for story_id, story_resp in zip(batch_ids, responses):
+                        if isinstance(story_resp, Exception):
+                            continue
+                        story = story_resp.json()
+                        if not story or story.get("type") != "story":
+                            continue
+                        title = story.get("title", "").lower()
+                        if any(kw in title for kw in ai_keywords):
+                            articles.append({
+                                "title": story.get("title", ""),
+                                "url": story.get("url", f"https://news.ycombinator.com/item?id={story_id}"),
+                                "source": "Hacker News",
+                                "source_type": "discussion",
+                                "publishedAt": datetime.fromtimestamp(story.get("time", 0), tz=timezone.utc).isoformat(),
+                                "description": f"Score: {story.get('score', 0)} | Comments: {story.get('descendants', 0)}",
+                                "hn_score": story.get("score", 0)
+                            })
+                            if len(articles) >= limit:
+                                break
                 return articles
             except Exception as e:
                 logger.error(f"HackerNews error: {type(e).__name__}: {e}")
@@ -797,20 +1068,26 @@ class NewsFetcher:
         scrape_timeout = DEFAULT_CONFIG["scrape_timeout"]
 
         async with httpx.AsyncClient(timeout=float(scrape_timeout)) as client:
-            for sub in subreddits:
-                try:
-                    resp = await client.get(
-                        f"https://www.reddit.com/r/{sub}/hot.json?limit=15",
-                        headers={"User-Agent": "AINewsBot/1.0"}
-                    )
-                    data = resp.json()
+            # Parallel fetch all subreddits
+            tasks = [
+                client.get(
+                    f"https://www.reddit.com/r/{sub}/hot.json?limit=15",
+                    headers={"User-Agent": "AINewsBot/1.0"}
+                )
+                for sub in subreddits
+            ]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
 
+            for sub, resp in zip(subreddits, responses):
+                if isinstance(resp, Exception):
+                    logger.info(f"Reddit {sub} error: {resp}")
+                    continue
+                try:
+                    data = resp.json()
                     for post in data.get("data", {}).get("children", []):
                         p = post.get("data", {})
-                        # 只过滤置顶帖，保留自发帖(is_self)
                         if p.get("stickied"):
                             continue
-
                         articles.append({
                             "title": p.get("title", ""),
                             "url": p.get("url", ""),
@@ -820,12 +1097,8 @@ class NewsFetcher:
                             "description": f"Score: {p.get('score', 0)} | Comments: {p.get('num_comments', 0)}",
                             "reddit_score": p.get("score", 0)
                         })
-
-                        if len(articles) >= limit:
-                            break
                 except Exception as e:
-                    logger.info(f"Reddit {sub} error: {e}")
-                    continue
+                    logger.info(f"Reddit {sub} parse error: {e}")
 
         return articles[:limit]
 
@@ -889,8 +1162,8 @@ class NewsFetcher:
             logger.info("No GLM key or no articles")
             return articles
 
-        # Process one article at a time for maximum quality
-        batch_size = 1
+        # Process multiple articles in parallel for better performance
+        batch_size = 3
         import json
         import re
 
@@ -1040,17 +1313,43 @@ Return only JSON."""
             language: 'zh' for Chinese, 'en' for English
             skip_glm: Always True - GLM generation is async
         """
+        # Load dev config for fetch limit
+        try:
+            import sys
+            import os
+            # Add parent directory to path for dev_config
+            news_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            if news_root not in sys.path:
+                sys.path.insert(0, news_root)
+            from dev_config import FETCH_LIMIT
+        except ImportError:
+            FETCH_LIMIT = -1  # Default: no limit
+
+        # Calculate per-source limit
+        if FETCH_LIMIT == -1:
+            rss_limit = 10
+            hn_limit = 15
+            reddit_limit = 15
+            newsapi_limit = 20
+        else:
+            # Distribute limit across sources (roughly equal)
+            per_source = max(1, FETCH_LIMIT // 4)
+            rss_limit = per_source
+            hn_limit = per_source
+            reddit_limit = per_source
+            newsapi_limit = per_source
+            logger.info(f"[DEV] Fetch limit: {FETCH_LIMIT}, per source: {per_source}")
 
         # Fetch from all sources in parallel
         logger.info("Fetching from multiple sources...")
 
         # RSS feeds (new verified sources)
-        rss_task = self.fetch_rss_feeds(limit_per_source=10)
+        rss_task = self.fetch_rss_feeds(limit_per_source=rss_limit)
 
         # Existing sources
-        hn_task = self.fetch_hackernews_ai(limit=15)
-        reddit_task = self.fetch_reddit_ai(limit=15)
-        newsapi_task = self.fetch_newsapi_ai(page_size=20)
+        hn_task = self.fetch_hackernews_ai(limit=hn_limit)
+        reddit_task = self.fetch_reddit_ai(limit=reddit_limit)
+        newsapi_task = self.fetch_newsapi_ai(page_size=newsapi_limit)
 
         rss_articles, hn_articles, reddit_articles, newsapi_articles = await asyncio.gather(
             rss_task, hn_task, reddit_task, newsapi_task
@@ -1092,9 +1391,9 @@ Return only JSON."""
             url = article.get("url", "")
             scrape_tasks.append(self.scrape_article_content(url))
 
-        # Run scraping with limited concurrency (5 at a time)
+        # Run scraping with limited concurrency (20 at a time)
         scraped_contents = []
-        batch_size = 5
+        batch_size = 20
         for i in range(0, len(scrape_tasks), batch_size):
             batch = scrape_tasks[i:i + batch_size]
             results = await asyncio.gather(*batch, return_exceptions=True)

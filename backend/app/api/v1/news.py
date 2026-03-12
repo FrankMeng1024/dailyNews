@@ -41,19 +41,15 @@ async def list_news(
     If quality_level is provided, uses that level's threshold
     Otherwise uses min_score if provided
     source_type filters by content type (news/blog/paper/discussion)
+
+    Shows news in 'refining' or 'ready' processing_status
     """
     query = db.query(News)
 
-    # IMPORTANT: Only show articles with sufficient content (successfully scraped)
-    # Filter out articles where scraping failed (original_content too short)
-    from sqlalchemy import func, or_
-    min_content_len = ConfigService.get(db, "min_content_length", 200)
-    query = query.filter(
-        or_(
-            func.length(News.original_content) >= min_content_len,
-            News.content_status == 'ready'  # Or has GLM-generated content ready
-        )
-    )
+    # IMPORTANT: Only show articles in 'refining' or 'ready' status
+    # 'refining' = 翻译完成，正在生成精炼内容（此时出现在 news list）
+    # 'ready' = 全部完成
+    query = query.filter(News.processing_status.in_(['refining', 'ready']))
 
     # IMPORTANT: Only show articles with Chinese title (title translation succeeded)
     # This ensures users never see English titles
@@ -110,15 +106,8 @@ async def get_today_news(
 
     query = db.query(News).filter(News.fetched_at >= today_start)
 
-    # Only show articles with sufficient content
-    from sqlalchemy import func, or_
-    min_content_len = ConfigService.get(db, "min_content_length", 200)
-    query = query.filter(
-        or_(
-            func.length(News.original_content) >= min_content_len,
-            News.content_status == 'ready'
-        )
-    )
+    # Only show articles in 'refining' or 'ready' status
+    query = query.filter(News.processing_status.in_(['refining', 'ready']))
 
     # Only show articles with Chinese title
     query = query.filter(News.title_zh.isnot(None))
@@ -215,6 +204,10 @@ async def get_refine_status(
     return {
         "id": news.id,
         "status": news.content_status or "pending",
+        "processing_status": news.processing_status,
+        "is_refining": news.processing_status == "refining",
+        "is_verified": news.verification_status == "verified",
+        "verification_score": float(news.verification_score) if news.verification_score else None,
         "content": news.content,
         "has_content": bool(news.content and len(news.content) > ConfigService.get(db, "min_summary_length", 50))
     }

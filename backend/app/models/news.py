@@ -90,6 +90,24 @@ class News(Base):
     # Source priority tier
     source_tier = Column(Integer, default=3, index=True, comment="Source priority tier (1=highest, 4=lowest)")
 
+    # Unified processing status (for admin display)
+    processing_status = Column(String(32), default="fetching", index=True,
+                              comment="Unified status: fetching/verifying/translating/refining/ready/failed")
+
+    # Verification fields (new feature)
+    verification_status = Column(String(32), default="pending",
+                                comment="Verification status: pending/verifying/verified/failed")
+    verification_score = Column(DECIMAL(5, 4),
+                               comment="Verification confidence score (0-1)")
+    verification_sources = Column(JSON,
+                                 comment="Verification source list")
+    verification_error = Column(String(512),
+                               comment="Verification error message")
+    verification_retry_count = Column(Integer, default=0,
+                                     comment="Verification retry count")
+    verification_next_retry_at = Column(TZDateTime,
+                                       comment="Next retry time for verification")
+
     def calculate_final_score(self):
         """
         Calculate comprehensive quality score using multi-dimensional scoring
@@ -309,3 +327,53 @@ class News(Base):
             self.title_next_retry_at = None
             if self.title_status == "failed":
                 self.title_status = "pending"
+
+    def calculate_processing_status(self, max_retries: int = 5) -> str:
+        """
+        Calculate unified processing status based on all sub-statuses.
+
+        Status flow: fetching -> verifying -> translating -> refining -> ready
+
+        Args:
+            max_retries: Maximum retry count before marking as failed
+
+        Returns:
+            One of: fetching, verifying, translating, refining, ready, failed
+        """
+        # 1. Check scraping status
+        has_content = self.original_content and len(self.original_content) >= 200
+        if not has_content:
+            if (self.scraping_retry_count or 0) >= max_retries:
+                return "failed"
+            return "fetching"
+
+        # 2. Check verification status (verification failure doesn't block flow)
+        if self.verification_status in ("pending", "verifying"):
+            return "verifying"
+
+        # 3. Check translation status
+        if self.title_status != "ready":
+            if self.title_status == "failed" and (self.title_retry_count or 0) >= max_retries:
+                return "failed"
+            return "translating"
+
+        # 4. Check refining status
+        if self.content_status != "ready":
+            if self.content_status == "failed" and (self.glm_retry_count or 0) >= max_retries:
+                return "failed"
+            return "refining"
+
+        return "ready"
+
+    def update_processing_status(self, max_retries: int = 5) -> str:
+        """
+        Calculate and update the processing_status field.
+
+        Args:
+            max_retries: Maximum retry count before marking as failed
+
+        Returns:
+            The new processing status
+        """
+        self.processing_status = self.calculate_processing_status(max_retries)
+        return self.processing_status

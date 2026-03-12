@@ -376,7 +376,6 @@
         .status-dot.loading { background: rgba(59,130,246,0.15); color: #3b82f6; }
         .status-dot.success { background: rgba(16,185,129,0.15); color: #10b981; }
         .status-dot.failed { background: rgba(239,68,68,0.15); color: #ef4444; cursor: pointer; }
-        .status-dot.loading::after { content: ''; width: 10px; height: 10px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
         .live-item-action { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text2); transition: all 0.2s; flex-shrink: 0; }
         .live-item-action:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
         .live-item-action.hidden { display: none; }
@@ -440,14 +439,42 @@
             background: rgba(59, 130, 246, 0.15);
             position: relative;
         }
-        .status-dot.loading::after {
-            content: '';
-            width: 8px;
-            height: 8px;
-            border: 2px solid #3b82f6;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+
+        /* Processing status tags (single status display) */
+        .status-tag {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .status-tag.fetching {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+        }
+        .status-tag.verifying {
+            background: rgba(139, 92, 246, 0.15);
+            color: #8b5cf6;
+        }
+        .status-tag.translating {
+            background: rgba(251, 191, 36, 0.15);
+            color: #f59e0b;
+        }
+        .status-tag.refining {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+        .status-tag.ready {
+            background: rgba(156, 163, 175, 0.15);
+            color: #9ca3af;
+        }
+        .status-tag.failed {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+        .status-tag.verified {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
         }
     </style>
 </head>
@@ -661,18 +688,23 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                     <div style="font-weight:600;">📰 实时新闻流 (<span id="live-articles-count">0</span>)</div>
                     <div style="display:flex;gap:8px;align-items:center;">
-                        <button id="refresh-live-btn" onclick="refreshLiveList()" style="padding:4px 10px;border-radius:6px;background:var(--bg);color:var(--primary);border:1px solid var(--border);font-size:11px;cursor:pointer;">🔄 刷新</button>
+                        <button id="retry-all-failed-btn" onclick="retryAllFailed()" style="padding:4px 10px;border-radius:6px;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:11px;cursor:pointer;display:none;">🔄 重试失败</button>
                         <button onclick="filterLiveList('all')" class="live-filter-btn active" data-filter="all" style="padding:4px 10px;border-radius:6px;background:var(--primary);color:#fff;border:none;font-size:11px;cursor:pointer;">全部</button>
                         <button onclick="filterLiveList('failed')" class="live-filter-btn" data-filter="failed" style="padding:4px 10px;border-radius:6px;background:var(--bg);color:var(--text2);border:1px solid var(--border);font-size:11px;cursor:pointer;">失败</button>
                     </div>
                 </div>
 
-                <!-- Status Legend -->
-                <div style="display:flex;gap:12px;font-size:10px;color:var(--text2);margin-bottom:8px;padding:6px 8px;background:var(--bg);border-radius:6px;">
-                    <div style="display:flex;align-items:center;gap:3px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(16,185,129,0.15);color:#10b981;font-size:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;">✓</div>成功</div>
-                    <div style="display:flex;align-items:center;gap:3px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,0.15);color:#ef4444;font-size:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;">✗</div>失败</div>
-                    <div style="display:flex;align-items:center;gap:3px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(156,163,175,0.15);color:#9ca3af;font-size:8px;display:flex;align-items:center;justify-content:center;">-</div>待处理</div>
-                    <span style="margin-left:auto;color:var(--text2);">顺序: 抓取 | 翻译 | 精炼</span>
+                <!-- Status Legend - 单一状态流程 -->
+                <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-bottom:8px;padding:6px 8px;background:var(--bg);border-radius:6px;flex-wrap:wrap;">
+                    <span class="status-tag fetching" style="font-size:9px;padding:2px 6px;">抓取中</span>
+                    <span style="color:var(--text2);">→</span>
+                    <span class="status-tag verifying" style="font-size:9px;padding:2px 6px;">验证中</span>
+                    <span style="color:var(--text2);">→</span>
+                    <span class="status-tag translating" style="font-size:9px;padding:2px 6px;">翻译中</span>
+                    <span style="color:var(--text2);">→</span>
+                    <span class="status-tag refining" style="font-size:9px;padding:2px 6px;">精炼中</span>
+                    <span style="color:var(--text2);">→</span>
+                    <span class="status-tag ready" style="font-size:9px;padding:2px 6px;">完成</span>
                 </div>
 
                 <!-- Live List -->
@@ -988,6 +1020,10 @@
                 await loadAudio();
                 await loadSettings();
                 renderHoursGrid();
+
+                // 检查是否有正在进行的抓取任务
+                await checkFetchStatus();
+
                 log('Init completed');
             } catch (e) {
                 console.error('Init error:', e);
@@ -1204,9 +1240,8 @@
 
             // Load retry page data if entering retry page
             if (name === 'retry') {
-                loadRetryStats();
+                restoreAdminState(); // 恢复状态（包括按钮、列表、统计）
                 loadFetchHistory();
-                loadRecentArticles(); // 加载最近的文章状态
             } else {
                 // Clear countdown when leaving retry page
                 if (countdownInterval) {
@@ -1216,15 +1251,13 @@
             }
         }
 
-        // 加载最近的文章状态（用于重新进入页面时显示）
+        // 加载最近的文章状态（用于重新进入页面时显示）- 使用统一状态
         async function loadRecentArticles() {
             const code = localStorage.getItem('creatorCode');
             if (!code) return;
 
             const list = document.getElementById('live-articles-list');
             if (!list) return;
-
-            // 每次进入页面都重新加载，不使用缓存
 
             try {
                 const response = await fetch('/api/v1/admin/retry-list?limit=30', {
@@ -1239,36 +1272,100 @@
                     return;
                 }
 
-                // 显示最近的文章
-                list.innerHTML = '';
+                // 使用统一状态显示
+                liveArticlesData = data.items.map(item => ({
+                    title: item.title || item.title_zh || '无标题',
+                    source: item.source_name,
+                    processingStatus: item.processing_status || 'fetching',
+                    isVerified: item.verification_status === 'verified',
+                    newsId: item.id
+                }));
+                liveArticlesCount = liveArticlesData.length;
+
                 const countEl = document.getElementById('live-articles-count');
-                if (countEl) countEl.textContent = data.items.length;
+                if (countEl) countEl.textContent = liveArticlesCount;
 
-                data.items.forEach(item => {
-                    const contentStatus = item.content_status || 'pending';
-                    const getStatusDot = (s) => {
-                        if (s === 'success' || s === 'ready') return '<div class="status-dot success">✓</div>';
-                        if (s === 'failed' || s === 'scrape_failed') return '<div class="status-dot failed">✗</div>';
-                        if (s === 'blocked') return '<div class="status-dot blocked">⏸</div>';
-                        if (s === 'loading' || s === 'generating') return '<div class="status-dot loading"></div>';
-                        return '<div class="status-dot pending">-</div>';
-                    };
-
-                    const hasFailed = contentStatus === 'failed' || contentStatus === 'scrape_failed';
-                    const div = document.createElement('div');
-                    div.className = `live-item ${hasFailed ? 'has-failed' : ''}`;
-                    div.innerHTML = `
-                        <div class="live-item-title">${(item.title || '无标题').slice(0, 40)}...</div>
-                        <div class="live-item-statuses">
-                            <div title="原文抓取">${getStatusDot('success')}</div>
-                            <div title="标题翻译">${getStatusDot(item.title_zh ? 'success' : 'pending')}</div>
-                            <div title="内容精炼">${getStatusDot(contentStatus)}</div>
-                        </div>
-                    `;
-                    list.appendChild(div);
-                });
+                renderLiveArticlesListFiltered();
             } catch (e) {
                 console.error('Failed to load recent articles:', e);
+            }
+        }
+
+        // 状态恢复 - 页面刷新或重新进入时恢复状态
+        async function restoreAdminState() {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) return;
+
+            try {
+                const response = await fetch('/api/v1/admin/current-state', {
+                    headers: { 'X-Creator-Code': code }
+                });
+
+                if (!response.ok) return;
+
+                const state = await response.json();
+
+                // 恢复按钮状态
+                if (state.is_fetching) {
+                    isFetching = true;
+                    setButtonState('running', state.current_stage || 'fetching');
+
+                    // 显示进度面板
+                    const progressContainer = document.getElementById('fetch-progress-container');
+                    const sourceStatus = document.getElementById('source-status');
+                    if (progressContainer) progressContainer.style.display = 'block';
+                    if (sourceStatus) sourceStatus.style.display = 'grid';
+
+                    // 尝试重新连接 SSE
+                    if (state.task_id) {
+                        reconnectSSE(state.task_id);
+                    }
+                }
+
+                // 恢复信息源卡片状态
+                if (state.source_status) {
+                    Object.entries(state.source_status).forEach(([source, status]) => {
+                        if (status.status === 'done') {
+                            updateSourceStatus(source, 'done', status.fetched || 0, status.saved || 0);
+                        } else if (status.status === 'loading') {
+                            updateSourceStatus(source, 'loading');
+                        } else if (status.status === 'error') {
+                            updateSourceStatus(source, 'error');
+                        }
+                    });
+                }
+
+                // 恢复新闻列表
+                if (state.processing_news && state.processing_news.length > 0) {
+                    liveArticlesData = state.processing_news.map(item => ({
+                        title: item.title || item.title_zh || '无标题',
+                        source: item.source_name,
+                        processingStatus: item.processing_status || 'fetching',
+                        isVerified: item.is_verified || false,
+                        newsId: item.id
+                    }));
+                    liveArticlesCount = liveArticlesData.length;
+
+                    const countEl = document.getElementById('live-articles-count');
+                    if (countEl) countEl.textContent = liveArticlesCount;
+
+                    renderLiveArticlesListFiltered();
+                }
+
+                // 恢复统计
+                if (state.stats) {
+                    const statTotal = document.getElementById('stat-total');
+                    const statSuccess = document.getElementById('stat-success');
+                    const statPending = document.getElementById('stat-pending');
+                    const statFailed = document.getElementById('stat-failed');
+
+                    if (statTotal) statTotal.textContent = state.stats.total || 0;
+                    if (statSuccess) statSuccess.textContent = state.stats.ready || 0;
+                    if (statPending) statPending.textContent = (state.stats.fetching || 0) + (state.stats.verifying || 0) + (state.stats.translating || 0) + (state.stats.refining || 0);
+                    if (statFailed) statFailed.textContent = state.stats.failed || 0;
+                }
+            } catch (e) {
+                console.error('Failed to restore admin state:', e);
             }
         }
 
@@ -1407,7 +1504,8 @@
             list.innerHTML = currentNews.map((n, i) => {
                 const sourceType = n.source_type || 'news';
                 const icon = getSourceTypeIcon(sourceType);
-                const isVerified = n.is_verified || false;
+                const isVerified = n.verification_status === 'verified' || n.is_verified || false;
+                const isRefining = n.processing_status === 'refining';
                 const isHot = (n.final_score || 0) > 0.8;
 
                 return `
@@ -1420,6 +1518,7 @@
                             <span>·</span>
                             <span class="news-time">${formatRelativeTime(n.published_at)}</span>
                             ${isVerified ? '<span class="news-tag verified">✓ 已验证</span>' : ''}
+                            ${isRefining ? '<span class="news-tag refining">精炼中</span>' : ''}
                             ${isHot ? '<span class="news-tag hot">热门</span>' : ''}
                         </div>
                     </div>
@@ -1476,14 +1575,16 @@
             const icon = getSourceTypeIcon(sourceType);
             const typeName = getSourceTypeName(sourceType);
             const typeColor = getSourceTypeColor(sourceType);
-            const isVerified = n.is_verified || false;
+            const isVerified = n.verification_status === 'verified' || n.is_verified || false;
+            const isRefining = n.processing_status === 'refining';
 
             // Store for tab switching
             window.detailContent = {
                 refined,
                 original,
                 englishTitle: hasEnglishTitle ? n.title : null,
-                url: n.source_url || ''
+                url: n.source_url || '',
+                isRefining: isRefining
             };
 
             document.getElementById('detail-body').innerHTML = `
@@ -1493,6 +1594,7 @@
                             ${icon} ${typeName}
                         </span>
                         ${isVerified ? '<span style="display:inline-flex;align-items:center;padding:3px 8px;background:#f6ffed;color:#52c41a;border-radius:6px;font-size:11px;font-weight:600">✓ 已验证</span>' : ''}
+                        ${isRefining ? '<span style="display:inline-flex;align-items:center;padding:3px 8px;background:rgba(16,185,129,0.15);color:#10b981;border-radius:6px;font-size:11px;font-weight:600">精炼中</span>' : ''}
                     </div>
                     <div class="detail-title">${n.title_zh || n.title}</div>
                     <div class="detail-meta">
@@ -1546,8 +1648,19 @@
                     const cleanContent = cleanText(window.detailContent.original || '暂无原文内容');
                     textEl.innerHTML = `<div class="original-content">${cleanContent}</div>`;
                 } else {
-                    const cleanContent = cleanText(window.detailContent.refined || '精炼生成中...');
-                    textEl.innerHTML = `<div class="original-content">${cleanContent}</div>`;
+                    // 精炼内容 - 如果正在精炼中，显示等待提示
+                    if (window.detailContent.isRefining) {
+                        textEl.innerHTML = `
+                            <div style="text-align:center;padding:60px 20px;">
+                                <div style="font-size:48px;margin-bottom:16px;">⏳</div>
+                                <div style="font-size:16px;color:var(--text);font-weight:500;margin-bottom:8px;">精炼中，请耐心等待...</div>
+                                <div style="font-size:13px;color:var(--text2);">AI 正在为您生成精炼内容</div>
+                            </div>
+                        `;
+                    } else {
+                        const cleanContent = cleanText(window.detailContent.refined || '暂无精炼内容');
+                        textEl.innerHTML = `<div class="original-content">${cleanContent}</div>`;
+                    }
                 }
             }
         }
@@ -2719,6 +2832,150 @@
         // ========== Dev Fetch SSE Functions ==========
         let fetchEventSource = null;
         let liveArticlesCount = 0;
+        let isFetching = false;
+        let fetchTimeout = null;
+
+        // 按钮状态管理
+        function setButtonState(state, stage = '') {
+            const btn = document.getElementById('dev-fetch-btn');
+            const refreshBtn = document.getElementById('refresh-live-btn');
+            if (!btn) return;
+
+            switch (state) {
+                case 'idle':
+                    btn.disabled = false;
+                    btn.innerHTML = '🚀 开始抓取新闻';
+                    btn.style.background = 'var(--primary-gradient)';
+                    btn.style.opacity = '1';
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.style.opacity = '1';
+                    }
+                    break;
+                case 'running':
+                    btn.disabled = true;
+                    const stageText = {
+                        'fetching': '抓取中',
+                        'processing': '处理中',
+                        'translating': '翻译中',
+                        'refining': '精炼中'
+                    }[stage] || '处理中';
+                    btn.innerHTML = `<span class="spinning" style="display:inline-block;">🔄</span> ${stageText}...`;
+                    btn.style.background = 'var(--bg-secondary, #e5e7eb)';
+                    btn.style.opacity = '0.7';
+                    if (refreshBtn) {
+                        refreshBtn.disabled = true;
+                        refreshBtn.style.opacity = '0.5';
+                    }
+                    break;
+                case 'failed':
+                    btn.disabled = false;
+                    btn.innerHTML = '⚠️ 上次失败，点击重试';
+                    btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                    btn.style.opacity = '1';
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.style.opacity = '1';
+                    }
+                    break;
+            }
+        }
+
+        // 页面加载时检查任务状态
+        async function checkFetchStatus() {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) return;
+
+            try {
+                const resp = await fetch('/api/v1/admin/fetch-status', {
+                    headers: { 'X-Creator-Code': code }
+                });
+                if (!resp.ok) return;
+
+                const data = await resp.json();
+
+                if (data.is_running) {
+                    // 有正在运行的任务，禁用按钮
+                    isFetching = true;
+                    setButtonState('running', data.current_stage);
+                    // 显示进度面板
+                    const progressContainer = document.getElementById('fetch-progress-container');
+                    const sourceStatus = document.getElementById('source-status');
+                    if (progressContainer) progressContainer.style.display = 'block';
+                    if (sourceStatus) sourceStatus.style.display = 'grid';
+                    // 尝试重新连接 SSE
+                    if (data.task_id) {
+                        reconnectSSE(data.task_id);
+                    }
+                } else if (data.last_error) {
+                    // 上次失败
+                    setButtonState('failed');
+                }
+            } catch (e) {
+                console.error('Check fetch status error:', e);
+            }
+        }
+
+        // 重新连接 SSE
+        function reconnectSSE(taskId) {
+            if (fetchEventSource) {
+                fetchEventSource.close();
+            }
+
+            fetchEventSource = new EventSource(`/api/v1/admin/fetch-stream/${taskId}`);
+
+            fetchEventSource.onmessage = (event) => {
+                try {
+                    const eventData = JSON.parse(event.data);
+                    handleFetchEvent(eventData);
+                } catch (e) {
+                    console.error('Parse SSE error:', e);
+                }
+            };
+
+            fetchEventSource.onerror = (e) => {
+                console.error('SSE reconnect error:', e);
+                if (fetchEventSource) {
+                    fetchEventSource.close();
+                    fetchEventSource = null;
+                }
+                // 检查任务是否已完成
+                checkFetchStatus();
+            };
+
+            // 启动超时保护
+            startFetchTimeout();
+        }
+
+        // 超时保护
+        function startFetchTimeout() {
+            clearFetchTimeout();
+            // 5分钟超时
+            fetchTimeout = setTimeout(() => {
+                if (isFetching) {
+                    console.warn('Fetch timeout, resetting state');
+                    finishFetch(false, '操作超时，请重试');
+                }
+            }, 5 * 60 * 1000);
+        }
+
+        function clearFetchTimeout() {
+            if (fetchTimeout) {
+                clearTimeout(fetchTimeout);
+                fetchTimeout = null;
+            }
+        }
+
+        // 刷新新闻列表
+        async function refreshLiveList() {
+            if (isFetching) {
+                showToast('抓取进行中，请稍候');
+                return;
+            }
+            await loadRecentArticles();
+            await loadRetryStats();
+            showToast('已刷新');
+        }
 
         async function startDevFetch() {
             const code = localStorage.getItem('creatorCode');
@@ -2727,11 +2984,8 @@
                 return;
             }
 
-            const btn = document.getElementById('dev-fetch-btn');
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '抓取中...';
-            }
+            isFetching = true;
+            setButtonState('running', 'fetching');
 
             // 显示进度面板
             const progressContainer = document.getElementById('fetch-progress-container');
@@ -2741,6 +2995,9 @@
 
             // 重置状态
             resetFetchUI();
+
+            // 启动超时保护
+            startFetchTimeout();
 
             try {
                 // 1. 启动 fetch 任务
@@ -2793,12 +3050,15 @@
 
             switch (event.type) {
                 case 'start':
+                    setButtonState('running', 'fetching');
                     updateFetchStatus(event.message, 5);
                     // 清空列表，准备接收新数据
                     const list = document.getElementById('live-articles-list');
                     if (list) list.innerHTML = '';
                     liveArticlesData = [];
                     liveArticlesCount = 0;
+                    sourceFetchCounts = {};
+                    sourceSaveCounts = {};
                     const countEl = document.getElementById('live-articles-count');
                     if (countEl) countEl.textContent = '0';
                     break;
@@ -2809,10 +3069,9 @@
                     break;
 
                 case 'source_complete':
-                    updateSourceStatus(event.source, 'done', event.count);
-                    if (event.articles) {
-                        event.articles.forEach(a => addLiveArticle(a.title, a.source || event.source, 'fetched', 'pending', 'pending', 'pending'));
-                    }
+                    sourceFetchCounts[event.source] = event.count || 0;
+                    sourceSaveCounts[event.source] = 0;
+                    updateSourceStatus(event.source, 'done', event.count, 0);
                     break;
 
                 case 'source_error':
@@ -2820,26 +3079,84 @@
                     break;
 
                 case 'processing':
+                    setButtonState('running', 'processing');
                     updateFetchStatus(event.message, 70);
                     break;
 
                 case 'article_saved':
-                    addLiveArticle(event.title, event.source, event.status, event.scrape_status || 'pending', event.title_status || 'pending', event.content_status || 'pending');
+                    // 新文章保存，使用统一状态
+                    const src = event.source || 'unknown';
+                    sourceSaveCounts[src] = (sourceSaveCounts[src] || 0) + 1;
+                    updateSourceStatus(src, 'done', sourceFetchCounts[src] || 0, sourceSaveCounts[src]);
+                    addLiveArticle(
+                        event.title,
+                        event.source,
+                        event.processing_status || 'fetching',
+                        event.is_verified || false,
+                        event.news_id,
+                        event.error || null
+                    );
+                    break;
+
+                case 'status_change':
+                    // 文章状态变更（携带 error 信息）
+                    updateLiveArticleStatus(event.news_id, event.new_status, event.is_verified, event.error || null);
+                    // 更新按钮状态
+                    if (event.new_status === 'verifying') {
+                        setButtonState('running', 'verifying');
+                    } else if (event.new_status === 'translating') {
+                        setButtonState('running', 'translating');
+                    } else if (event.new_status === 'refining') {
+                        setButtonState('running', 'refining');
+                    }
+                    break;
+
+                case 'verification_complete':
+                    // 验证完成
+                    updateLiveArticleStatus(event.news_id, 'translating', event.is_verified);
                     break;
 
                 case 'batch_start':
-                    // 批量处理开始，更新所有文章的对应状态为 loading
-                    updateAllArticleStatus(event.batch_type, 'loading');
-                    updateFetchStatus(event.message || `正在${event.batch_type === 'title_translation' ? '翻译标题' : '精炼内容'}...`, event.batch_type === 'title_translation' ? 75 : 85);
+                    // 批量处理开始
+                    if (event.batch_type === 'verification') {
+                        setButtonState('running', 'verifying');
+                        updateAllArticleProcessingStatus('verifying');
+                        updateFetchStatus('验证新闻真实性...', 72);
+                    } else if (event.batch_type === 'title_translation') {
+                        setButtonState('running', 'translating');
+                        updateAllArticleProcessingStatus('translating');
+                        updateFetchStatus('翻译标题...', 80);
+                    } else if (event.batch_type === 'content_generation') {
+                        setButtonState('running', 'refining');
+                        updateAllArticleProcessingStatus('refining');
+                        updateFetchStatus('精炼内容...', 90);
+                    }
                     break;
 
                 case 'batch_complete':
-                    // 批量处理完成，更新所有文章的对应状态
-                    updateAllArticleStatus(event.batch_type, 'success', event.success || 0);
+                    // 批量处理完成
+                    if (event.batch_type === 'verification') {
+                        // 验证完成，更新验证状态
+                        if (event.verified_ids) {
+                            event.verified_ids.forEach(id => {
+                                const article = liveArticlesData.find(a => a.newsId === id);
+                                if (article) article.isVerified = true;
+                            });
+                        }
+                    } else if (event.batch_type === 'content_generation') {
+                        // 精炼完成，移除已完成的文章
+                        liveArticlesData = liveArticlesData.filter(a => a.processingStatus !== 'ready');
+                        liveArticlesCount = liveArticlesData.length;
+                        const countEl2 = document.getElementById('live-articles-count');
+                        if (countEl2) countEl2.textContent = liveArticlesCount;
+                    }
+                    renderLiveArticlesListFiltered();
                     break;
 
                 case 'complete':
-                    updateFetchStatus(`完成！新增 ${event.new_count} 条，重复 ${event.duplicate_count} 条`, 100);
+                    // 使用 translated_count 作为新增数量
+                    const newCount = event.translated_count || event.new_count || 0;
+                    updateFetchStatus(`完成！新增 ${newCount} 条，过滤 ${event.filtered_count || event.duplicate_count || 0} 条`, 100);
                     finishFetch(true);
                     break;
 
@@ -2848,29 +3165,23 @@
                     break;
 
                 case 'heartbeat':
-                    // 保持连接
+                    // 保持连接，重置超时
+                    startFetchTimeout();
                     break;
             }
         }
 
-        // 更新所有文章的指定状态
-        function updateAllArticleStatus(batchType, status, successCount) {
-            // 根据批处理类型确定要更新的状态字段
-            let statusField;
-            if (batchType === 'scraping') statusField = 'scrapeStatus';
-            else if (batchType === 'title_translation') statusField = 'titleStatus';
-            else statusField = 'contentStatus';
-
-            // 更新数据
+        // 更新所有文章的处理状态（统一状态）
+        function updateAllArticleProcessingStatus(newStatus) {
             liveArticlesData.forEach(article => {
-                article[statusField] = status;
+                if (article.processingStatus !== 'failed' && article.processingStatus !== 'ready') {
+                    article.processingStatus = newStatus;
+                }
             });
-
-            // 重新渲染列表
             renderLiveArticlesListFiltered();
         }
 
-        function updateSourceStatus(source, status, count) {
+        function updateSourceStatus(source, status, fetchCount, saveCount) {
             const item = document.querySelector(`.source-item[data-source="${source}"]`);
             if (!item) return;
 
@@ -2884,7 +3195,12 @@
             } else if (status === 'done') {
                 icon.textContent = '✅';
                 icon.classList.remove('spinning');
-                countEl.textContent = count + ' 条';
+                // 显示 "抓取数 → 保存数" 格式
+                if (saveCount !== undefined && saveCount > 0) {
+                    countEl.textContent = `${fetchCount} → ${saveCount}`;
+                } else {
+                    countEl.textContent = fetchCount + ' 条';
+                }
             } else if (status === 'error') {
                 icon.textContent = '❌';
                 icon.classList.remove('spinning');
@@ -2902,6 +3218,9 @@
         // 存储实时文章数据用于筛选
         let liveArticlesData = [];
         let currentLiveFilter = 'all';
+        // 跟踪每个 source 的抓取和保存数量
+        let sourceFetchCounts = {};
+        let sourceSaveCounts = {};
 
         function filterLiveList(filter) {
             currentLiveFilter = filter;
@@ -2922,54 +3241,215 @@
             renderLiveArticlesListFiltered();
         }
 
-        // 根据当前筛选条件渲染列表
+        // 根据当前筛选条件渲染列表 - 使用单一状态标签
         function renderLiveArticlesListFiltered() {
             const list = document.getElementById('live-articles-list');
             if (!list) return;
 
             const filtered = currentLiveFilter === 'all' ? liveArticlesData : liveArticlesData.filter(a => {
-                return a.scrapeStatus === 'failed' || a.titleStatus === 'failed' || a.contentStatus === 'failed';
+                return a.processingStatus === 'failed';
             });
+
+            // 显示/隐藏重试全部失败按钮
+            const retryAllBtn = document.getElementById('retry-all-failed-btn');
+            const failedCount = liveArticlesData.filter(a => a.processingStatus === 'failed').length;
+            if (retryAllBtn) {
+                retryAllBtn.style.display = failedCount > 0 ? 'block' : 'none';
+            }
 
             if (filtered.length === 0) {
                 list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);font-size:12px;">暂无数据</div>';
                 return;
             }
 
-            const getStatusDot = (s) => {
-                if (s === 'success' || s === 'ready') return '<div class="status-dot success">✓</div>';
-                if (s === 'failed') return '<div class="status-dot failed">✗</div>';
-                if (s === 'blocked') return '<div class="status-dot blocked">⏸</div>';
-                if (s === 'loading' || s === 'generating') return '<div class="status-dot loading"></div>';
-                return '<div class="status-dot pending">-</div>';
+            // 获取单一状态标签
+            const getStatusTag = (status, isVerified) => {
+                const statusMap = {
+                    'fetching': '<span class="status-tag fetching">抓取中</span>',
+                    'verifying': '<span class="status-tag verifying">验证中</span>',
+                    'translating': '<span class="status-tag translating">翻译中</span>',
+                    'refining': '<span class="status-tag refining">精炼中</span>',
+                    'ready': '<span class="status-tag ready">完成</span>',
+                    'failed': '<span class="status-tag failed">失败</span>'
+                };
+                let tag = statusMap[status] || '<span class="status-tag">未知</span>';
+                // 如果已验证，添加验证标签
+                if (isVerified && status !== 'failed') {
+                    tag = '<span class="status-tag verified">已验证</span>' + tag;
+                }
+                return tag;
             };
 
             list.innerHTML = filtered.map(article => {
-                const hasFailed = article.scrapeStatus === 'failed' || article.titleStatus === 'failed' || article.contentStatus === 'failed' || article.contentStatus === 'blocked';
+                const hasFailed = article.processingStatus === 'failed';
+                const errorMsg = article.error || '';
                 return `
                     <div class="live-item ${hasFailed ? 'has-failed' : ''}">
                         <div class="live-item-title">${(article.title || '无标题').slice(0, 40)}...</div>
-                        <div class="live-item-statuses">
-                            <div title="原文抓取">${getStatusDot(article.scrapeStatus)}</div>
-                            <div title="标题翻译">${getStatusDot(article.titleStatus)}</div>
-                            <div title="内容精炼">${getStatusDot(article.contentStatus)}</div>
+                        <div class="live-item-statuses" style="display:flex;align-items:center;gap:6px;">
+                            ${getStatusTag(article.processingStatus, article.isVerified)}
+                            ${hasFailed && errorMsg ? `<span onclick="toggleErrorDetail(${article.newsId})" style="padding:2px 6px;border-radius:4px;background:rgba(156,163,175,0.15);color:#6b7280;font-size:10px;cursor:pointer;">详情</span>` : ''}
+                            ${hasFailed && article.newsId ? `<button onclick="retrySingle(${article.newsId}, event)" style="padding:2px 8px;border-radius:4px;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:10px;cursor:pointer;">重试</button>` : ''}
                         </div>
                     </div>
+                    ${hasFailed && errorMsg ? `<div id="error-detail-${article.newsId}" class="error-detail" style="display:none;padding:8px 12px;margin:-4px 0 8px 0;background:rgba(239,68,68,0.05);border-radius:6px;font-size:11px;color:#ef4444;font-family:monospace;word-break:break-all;">${errorMsg}</div>` : ''}
                 `;
             }).join('');
         }
 
-        function addLiveArticle(title, source, status, scrapeStatus, titleStatus, contentStatus) {
+        // 添加实时文章 - 使用统一处理状态
+        function addLiveArticle(title, source, processingStatus, isVerified = false, newsId = null, error = null) {
             const countEl = document.getElementById('live-articles-count');
 
             liveArticlesCount++;
             if (countEl) countEl.textContent = liveArticlesCount;
 
-            // 存储数据（不再存储html，动态渲染）
-            liveArticlesData.unshift({ title, source, status, scrapeStatus, titleStatus, contentStatus });
+            // 存储数据（使用统一状态）
+            liveArticlesData.unshift({
+                title,
+                source,
+                processingStatus,
+                isVerified,
+                newsId,
+                error
+            });
 
             // 重新渲染列表（根据当前筛选条件）
             renderLiveArticlesListFiltered();
+        }
+
+        // 展开/收起错误详情
+        function toggleErrorDetail(newsId) {
+            const detail = document.getElementById(`error-detail-${newsId}`);
+            if (detail) {
+                detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        // 单条重试
+        async function retrySingle(newsId, event) {
+            if (event) event.stopPropagation();
+
+            // 检查 newsId 是否有效
+            if (!newsId) {
+                showToast('无法重试：文章ID无效');
+                return;
+            }
+
+            const code = localStorage.getItem('creatorCode');
+            if (!code) {
+                showToast('请先验证创作者代码');
+                return;
+            }
+
+            // 禁用按钮防止重复点击
+            const btn = event ? event.target : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '重试中...';
+                btn.style.opacity = '0.6';
+            }
+
+            try {
+                const response = await fetch(`/api/v1/admin/retry-single?news_id=${newsId}`, {
+                    method: 'POST',
+                    headers: { 'X-Creator-Code': code }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showToast('重试已触发');
+                    // 更新本地状态
+                    const article = liveArticlesData.find(a => a.newsId === newsId);
+                    if (article) {
+                        article.processingStatus = 'fetching';
+                        article.error = null;
+                        renderLiveArticlesListFiltered();
+                    }
+                } else {
+                    showToast(result.message || '重试失败');
+                    // 恢复按钮状态
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = '重试';
+                        btn.style.opacity = '1';
+                    }
+                }
+            } catch (e) {
+                showToast('重试失败: ' + e.message);
+                // 恢复按钮状态
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '重试';
+                    btn.style.opacity = '1';
+                }
+            }
+        }
+
+        // 重试全部失败
+        async function retryAllFailed() {
+            const code = localStorage.getItem('creatorCode');
+            if (!code) {
+                showToast('请先验证创作者代码');
+                return;
+            }
+
+            const failedCount = liveArticlesData.filter(a => a.processingStatus === 'failed').length;
+            if (failedCount === 0) {
+                showToast('没有失败的项目');
+                return;
+            }
+
+            try {
+                // 先重置所有失败状态
+                await fetch('/api/v1/admin/reset-all-failed', {
+                    method: 'POST',
+                    headers: { 'X-Creator-Code': code }
+                });
+
+                // 然后触发重试
+                const response = await fetch('/api/v1/admin/retry-all-pending', {
+                    method: 'POST',
+                    headers: { 'X-Creator-Code': code }
+                });
+                const result = await response.json();
+                showToast(`已触发重试 ${result.processed || 0} 条`);
+
+                // 更新本地状态
+                liveArticlesData.forEach(a => {
+                    if (a.processingStatus === 'failed') {
+                        a.processingStatus = 'fetching';
+                        a.error = null;
+                    }
+                });
+                renderLiveArticlesListFiltered();
+            } catch (e) {
+                showToast('重试失败: ' + e.message);
+            }
+        }
+
+        // 更新文章状态
+        function updateLiveArticleStatus(newsId, newStatus, isVerified = null, error = null) {
+            const article = liveArticlesData.find(a => a.newsId === newsId);
+            if (article) {
+                article.processingStatus = newStatus;
+                if (isVerified !== null) {
+                    article.isVerified = isVerified;
+                }
+                if (error !== null) {
+                    article.error = error;
+                }
+                // 如果状态变为 ready，从列表中移除
+                if (newStatus === 'ready') {
+                    const idx = liveArticlesData.findIndex(a => a.newsId === newsId);
+                    if (idx >= 0) {
+                        liveArticlesData.splice(idx, 1);
+                        liveArticlesCount = Math.max(0, liveArticlesCount - 1);
+                        const countEl = document.getElementById('live-articles-count');
+                        if (countEl) countEl.textContent = liveArticlesCount;
+                    }
+                }
+                renderLiveArticlesListFiltered();
+            }
         }
 
         function addFetchLog(event) {
@@ -2983,10 +3463,16 @@
         }
 
         function finishFetch(success, errorMsg) {
-            const btn = document.getElementById('dev-fetch-btn');
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = '开始抓取';
+            isFetching = false;
+
+            // 清除超时保护
+            clearFetchTimeout();
+
+            // 使用统一的按钮状态管理
+            if (success) {
+                setButtonState('idle');
+            } else {
+                setButtonState('failed');
             }
 
             const icon = document.getElementById('fetch-status-icon');
@@ -3010,6 +3496,7 @@
                 refreshRetryList();
                 loadFetchHistory();
                 loadNews(); // 刷新首页新闻列表
+                loadRetryStats(); // 刷新统计卡片
             }
         }
 

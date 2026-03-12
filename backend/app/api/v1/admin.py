@@ -17,6 +17,8 @@ from app.database import get_db, SessionLocal
 from app.services.content_retry_service import content_retry_service
 from app.services.config_service import ConfigService, DEFAULT_CONFIG
 from app.services.error_tracking_service import error_tracker
+from app.services.quality_scorer import quality_scorer
+from app.services.verification_service import get_verification_service
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,17 @@ CREATOR_CODE = getattr(settings, 'CREATOR_CODE', 'creator2026')
 
 # 全局事件队列 - 用于 SSE 实时推送
 fetch_events: Dict[str, asyncio.Queue] = {}
+
+# 全局任务状态 - 用于跟踪当前抓取任务
+current_fetch_task: Dict[str, Any] = {
+    "task_id": None,
+    "is_running": False,
+    "current_stage": None,  # fetching / verifying / translating / refining
+    "started_at": None,
+    "last_error": None,
+    "source_status": {},  # 各信息源状态
+    "stats": {}  # 统计数据
+}
 
 
 def verify_creator_code(x_creator_code: str = Header(...)):
@@ -51,6 +64,113 @@ async def verify_code(code: str):
 
 
 # ========== SSE 实时 Fetch 功能 ==========
+
+@router.get("/fetch-status")
+async def get_fetch_status(_: bool = Depends(verify_creator_code)):
+    """获取当前抓取任务状态"""
+    return {
+        "is_running": current_fetch_task["is_running"],
+        "task_id": current_fetch_task["task_id"],
+        "current_stage": current_fetch_task["current_stage"],
+        "started_at": current_fetch_task["started_at"],
+        "last_error": current_fetch_task["last_error"],
+        "source_status": current_fetch_task.get("source_status", {}),
+        "stats": current_fetch_task.get("stats", {})
+    }
+
+
+@router.get("/current-state")
+async def get_current_state(
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_creator_code)
+):
+    """
+    获取当前系统状态，用于页面刷新后恢复
+
+    返回:
+    - is_fetching: 是否正在抓取
+    - task_id: 当前任务ID
+    - current_stage: 当前阶段
+    - source_status: 各信息源状态
+    - processing_news: 正在处理的新闻列表
+    - stats: 统计数据
+    """
+    from app.models.news import News
+
+    # 获取正在处理的新闻（非 ready 状态）
+    processing_news = db.query(News).filter(
+        News.processing_status.in_(['fetching', 'verifying', 'translating', 'refining', 'failed'])
+    ).order_by(News.created_at.desc()).limit(100).all()
+
+    # 格式化新闻列表
+    news_list = []
+    for news in processing_news:
+        news_list.append({
+            "id": news.id,
+            "title": news.title[:60] if news.title else "",
+            "title_zh": news.title_zh[:60] if news.title_zh else None,
+            "source": news.source_name[:20] if news.source_name else "",
+            "processing_status": news.processing_status,
+            "verification_status": news.verification_status,
+            "is_verified": news.verification_status == "verified",
+            "created_at": news.created_at.isoformat() if news.created_at else None
+        })
+
+    # 获取统计数据
+    stats = {
+        "fetching": db.query(func.count(News.id)).filter(News.processing_status == "fetching").scalar() or 0,
+        "verifying": db.query(func.count(News.id)).filter(News.processing_status == "verifying").scalar() or 0,
+        "translating": db.query(func.count(News.id)).filter(News.processing_status == "translating").scalar() or 0,
+        "refining": db.query(func.count(News.id)).filter(News.processing_status == "refining").scalar() or 0,
+        "failed": db.query(func.count(News.id)).filter(News.processing_status == "failed").scalar() or 0,
+        "ready": db.query(func.count(News.id)).filter(News.processing_status == "ready").scalar() or 0
+    }
+
+    return {
+        "is_fetching": current_fetch_task["is_running"],
+        "task_id": current_fetch_task["task_id"],
+        "current_stage": current_fetch_task["current_stage"],
+        "source_status": current_fetch_task.get("source_status", {}),
+        "processing_news": news_list,
+        "stats": stats
+    }
+
+
+@router.get("/processing-stats")
+async def get_processing_stats(
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_creator_code)
+):
+    """获取各处理状态的数量统计"""
+    from app.models.news import News
+    from datetime import datetime, timezone, timedelta
+
+    # 今天的开始时间
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    stats = {
+        "fetching": db.query(func.count(News.id)).filter(News.processing_status == "fetching").scalar() or 0,
+        "verifying": db.query(func.count(News.id)).filter(News.processing_status == "verifying").scalar() or 0,
+        "translating": db.query(func.count(News.id)).filter(News.processing_status == "translating").scalar() or 0,
+        "refining": db.query(func.count(News.id)).filter(News.processing_status == "refining").scalar() or 0,
+        "failed": db.query(func.count(News.id)).filter(News.processing_status == "failed").scalar() or 0,
+        "ready": db.query(func.count(News.id)).filter(News.processing_status == "ready").scalar() or 0,
+        "ready_today": db.query(func.count(News.id)).filter(
+            News.processing_status == "ready",
+            News.created_at >= today_start
+        ).scalar() or 0,
+        "verified_count": db.query(func.count(News.id)).filter(
+            News.verification_status == "verified"
+        ).scalar() or 0
+    }
+
+    # 计算总数和处理中数量
+    stats["total"] = sum([stats["fetching"], stats["verifying"], stats["translating"],
+                         stats["refining"], stats["failed"], stats["ready"]])
+    stats["processing"] = sum([stats["fetching"], stats["verifying"], stats["translating"], stats["refining"]])
+
+    return stats
+
 
 @router.get("/fetch-stream/{task_id}")
 async def fetch_stream(task_id: str):
@@ -87,6 +207,13 @@ async def admin_fetch_news(
     _: bool = Depends(verify_creator_code)
 ):
     """开发者模式 fetch，返回 task_id 用于 SSE 订阅"""
+    # 检查是否有正在运行的任务
+    if current_fetch_task["is_running"]:
+        raise HTTPException(
+            status_code=409,
+            detail="已有任务正在运行，请等待完成"
+        )
+
     task_id = str(uuid.uuid4())
     fetch_events[task_id] = asyncio.Queue()
 
@@ -98,6 +225,7 @@ async def admin_fetch_news(
 
 async def do_fetch_with_events(task_id: str, force: bool):
     """带事件推送的 fetch 任务"""
+    global current_fetch_task
     from app.services.news_fetcher import news_fetcher
     from app.models.news import News
     from app.models.system_config import FetchHistory
@@ -108,6 +236,17 @@ async def do_fetch_with_events(task_id: str, force: bool):
     if not queue:
         return
 
+    # 设置全局任务状态
+    current_fetch_task = {
+        "task_id": task_id,
+        "is_running": True,
+        "current_stage": "fetching",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "last_error": None,
+        "source_status": {},
+        "stats": {}
+    }
+
     async def emit(event_type: str, **data):
         await queue.put({"type": event_type, **data})
 
@@ -116,6 +255,26 @@ async def do_fetch_with_events(task_id: str, force: bool):
 
     try:
         await emit("start", message="开始抓取新闻...")
+
+        # 读取 dev_config.py 配置（与 news_fetcher.py 保持一致）
+        try:
+            import sys
+            import os
+            # admin.py 在 backend/app/api/v1/admin.py，dev_config.py 在 News/dev_config.py
+            # 需要 5 层 dirname: v1 -> api -> app -> backend -> News
+            news_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+            if news_root not in sys.path:
+                sys.path.insert(0, news_root)
+            from dev_config import FETCH_LIMIT
+        except ImportError:
+            FETCH_LIMIT = -1
+
+        if FETCH_LIMIT > 0:
+            per_source = max(1, FETCH_LIMIT // 4)
+        else:
+            per_source = 15  # 默认值
+
+        logger.info(f"[DEV] Fetch limit from dev_config: {FETCH_LIMIT}, per_source: {per_source}")
 
         # 记录 fetch 历史
         fetch_history = FetchHistory(
@@ -132,7 +291,7 @@ async def do_fetch_with_events(task_id: str, force: bool):
         # 1. 抓取 Hacker News
         await emit("source_start", source="hackernews", message="正在获取 Hacker News...")
         try:
-            hn_articles = await news_fetcher.fetch_hackernews_ai(limit=15)
+            hn_articles = await news_fetcher.fetch_hackernews_ai(limit=per_source)
             await emit("source_complete", source="hackernews", count=len(hn_articles),
                        articles=[{"title": a.get("title", "")[:60], "source": "HN"} for a in hn_articles[:5]])
             all_articles.extend(hn_articles)
@@ -143,7 +302,7 @@ async def do_fetch_with_events(task_id: str, force: bool):
         # 2. 抓取 Reddit
         await emit("source_start", source="reddit", message="正在获取 Reddit AI...")
         try:
-            reddit_articles = await news_fetcher.fetch_reddit_ai(limit=15)
+            reddit_articles = await news_fetcher.fetch_reddit_ai(limit=per_source)
             await emit("source_complete", source="reddit", count=len(reddit_articles),
                        articles=[{"title": a.get("title", "")[:60], "source": "Reddit"} for a in reddit_articles[:5]])
             all_articles.extend(reddit_articles)
@@ -154,7 +313,7 @@ async def do_fetch_with_events(task_id: str, force: bool):
         # 3. 抓取 RSS
         await emit("source_start", source="rss", message="正在获取 RSS 订阅...")
         try:
-            rss_articles = await news_fetcher.fetch_rss_feeds(limit_per_source=10)
+            rss_articles = await news_fetcher.fetch_rss_feeds(limit_per_source=per_source)
             await emit("source_complete", source="rss", count=len(rss_articles),
                        articles=[{"title": a.get("title", "")[:60], "source": "RSS"} for a in rss_articles[:5]])
             all_articles.extend(rss_articles)
@@ -169,7 +328,7 @@ async def do_fetch_with_events(task_id: str, force: bool):
             if not news_fetcher.api_key or news_fetcher.api_key == "your_newsapi_key_here":
                 await emit("source_error", source="newsapi", error="API密钥未配置")
             else:
-                newsapi_articles = await news_fetcher.fetch_newsapi_ai(page_size=20)
+                newsapi_articles = await news_fetcher.fetch_newsapi_ai(page_size=per_source)
                 await emit("source_complete", source="newsapi", count=len(newsapi_articles),
                            articles=[{"title": a.get("title", "")[:60], "source": "NewsAPI"} for a in newsapi_articles[:5]])
                 all_articles.extend(newsapi_articles)
@@ -216,20 +375,27 @@ async def do_fetch_with_events(task_id: str, force: bool):
                     source_type=article.get("source_type", "news"),
                     # 抓取失败的文章，content_status 设为 scrape_failed，等待重试抓取
                     content_status="pending" if scrape_success else "scrape_failed",
-                    title_status="pending"
+                    title_status="pending",
+                    # 设置初始 processing_status
+                    processing_status="fetching",
+                    verification_status="pending"
                 )
+
+                # Calculate quality score
+                quality_scorer.calculate_comprehensive_score(news)
+
                 db.add(news)
+                db.flush()  # 立即获取 news.id，否则 emit 时 id 为 None
                 new_count += 1
 
-                # 每保存一条发送事件（包含三状态）
+                # 每保存一条发送事件（包含 processing_status）
                 await emit("article_saved",
-                    id=news.id,
+                    news_id=news.id,
                     title=title[:50],
-                    source=article.get("source_name", "")[:20],
-                    status="new",
-                    scrape_status="success" if scrape_success else "failed",
-                    title_status="pending",
-                    content_status="pending" if scrape_success else "blocked"  # blocked 表示等待抓取成功
+                    source=article.get("source", article.get("source_name", "Unknown"))[:20],
+                    processing_status="fetching",
+                    is_verified=False,
+                    scrape_status="success" if scrape_success else "failed"
                 )
 
             except Exception as e:
@@ -238,8 +404,7 @@ async def do_fetch_with_events(task_id: str, force: bool):
 
         db.commit()
 
-        # ========== 新增：批量抓取全文 ==========
-        # 获取所有新保存的文章ID（不管content长度）
+        # ========== 获取所有新保存的文章ID ==========
         all_new_ids = []
         for article in all_articles:
             url = article.get("url") or article.get("link") or ""
@@ -249,9 +414,32 @@ async def do_fetch_with_events(task_id: str, force: bool):
             if news:
                 all_new_ids.append(news.id)
 
+        # ========== 新增：处理初始内容足够的文章 ==========
+        # 这些文章不需要抓取全文，直接进入验证阶段
+        articles_with_content = db.query(News).filter(
+            News.id.in_(all_new_ids),
+            News.processing_status == "fetching",
+            func.length(News.original_content) >= 200
+        ).all()
+
+        for news in articles_with_content:
+            news.processing_status = "verifying"
+            await emit("status_change",
+                news_id=news.id,
+                old_status="fetching",
+                new_status="verifying"
+            )
+
+        if articles_with_content:
+            db.commit()
+            logger.info(f"Moved {len(articles_with_content)} articles with sufficient content to verifying")
+        # ========== 处理结束 ==========
+
+        # ========== 批量抓取全文 ==========
         # 筛选需要抓取全文的文章（original_content < 200字符）
         articles_to_scrape = db.query(News).filter(
             News.id.in_(all_new_ids),
+            News.processing_status == "fetching",  # 只处理还在 fetching 状态的
             (News.original_content == None) | (func.length(News.original_content) < 200)
         ).all()
 
@@ -265,62 +453,286 @@ async def do_fetch_with_events(task_id: str, force: bool):
                     if scraped and len(scraped) >= 200:
                         news.original_content = scraped
                         news.content_status = "pending"
+                        news.processing_status = "verifying"  # 抓取成功，进入验证阶段
                         scrape_success += 1
                     else:
-                        news.content_status = "scrape_failed"
-                        news.scraping_last_error = f"Content too short: {len(scraped or '')} chars"
+                        # 抓取失败，尝试使用 summary 作为备用内容
+                        # 对于 JS 渲染的网站（OpenAI、DeepMind 等），summary 通常来自 RSS/API
+                        fallback_content = news.summary or ""
+                        if len(fallback_content) >= 100:
+                            # summary 足够长，使用它作为 original_content
+                            news.original_content = fallback_content
+                            news.content_status = "pending"
+                            news.processing_status = "verifying"
+                            scrape_success += 1
+                            logger.info(f"Using summary as fallback for {news.source_url[:50]}")
+                        else:
+                            error_msg = f"Content too short: {len(scraped or '')} chars, summary: {len(fallback_content)} chars"
+                            news.content_status = "scrape_failed"
+                            news.processing_status = "failed"
+                            news.scraping_last_error = error_msg
+                            # 发送失败状态变更事件
+                            await emit("status_change",
+                                news_id=news.id,
+                                old_status="fetching",
+                                new_status="failed",
+                                error=error_msg
+                            )
                 except Exception as e:
-                    news.content_status = "scrape_failed"
-                    news.scraping_last_error = str(e)[:500]
-                    logger.error(f"Scrape error for {news.source_url}: {e}")
+                    # 异常时也尝试 summary 备用
+                    fallback_content = news.summary or ""
+                    if len(fallback_content) >= 100:
+                        news.original_content = fallback_content
+                        news.content_status = "pending"
+                        news.processing_status = "verifying"
+                        scrape_success += 1
+                        logger.info(f"Using summary as fallback after error for {news.source_url[:50]}")
+                    else:
+                        error_msg = str(e)[:500]
+                        news.content_status = "scrape_failed"
+                        news.processing_status = "failed"
+                        news.scraping_last_error = error_msg
+                        logger.error(f"Scrape error for {news.source_url}: {e}")
+                        # 发送失败状态变更事件
+                        await emit("status_change",
+                            news_id=news.id,
+                            old_status="fetching",
+                            new_status="failed",
+                            error=error_msg
+                        )
             db.commit()
             await emit("batch_complete", batch_type="scraping", success=scrape_success)
         # ========== 抓取全文结束 ==========
 
-        # 获取抓取成功的文章ID（content_status == "pending" 表示抓取成功，等待翻译和精炼）
+        # ========== 新增：验证阶段 ==========
+        # 获取需要验证的文章（processing_status == "verifying"）
+        articles_to_verify = db.query(News).filter(
+            News.id.in_(all_new_ids),
+            News.processing_status == "verifying"
+        ).all()
+
+        translated_count = 0  # 用于记录「新增」数量
+
+        if articles_to_verify:
+            current_fetch_task["current_stage"] = "verifying"
+            await emit("batch_start", batch_type="verification", count=len(articles_to_verify),
+                       message=f"正在验证 {len(articles_to_verify)} 篇新闻...")
+
+            verification_service = get_verification_service()
+            verify_success = 0
+
+            for news in articles_to_verify:
+                try:
+                    result = await verification_service.verify_news(news)
+                    news.verification_status = "verified" if result.is_verified else "failed"
+                    news.verification_score = result.confidence_score
+                    news.verification_sources = result.details
+                    news.verification_error = result.error
+                    # 验证完成后进入翻译阶段（不管验证成功失败）
+                    news.processing_status = "translating"
+                    if result.is_verified:
+                        verify_success += 1
+                    # 发送状态变更事件
+                    await emit("status_change",
+                        news_id=news.id,
+                        old_status="verifying",
+                        new_status="translating",
+                        is_verified=result.is_verified,
+                        confidence=result.confidence_score
+                    )
+                except Exception as e:
+                    logger.error(f"Verification error for news {news.id}: {e}")
+                    news.verification_status = "failed"
+                    news.verification_error = str(e)[:500]
+                    news.processing_status = "translating"  # 验证失败也继续
+
+            db.commit()
+            await emit("batch_complete", batch_type="verification", success=verify_success)
+        # ========== 验证阶段结束 ==========
+
+        # 获取需要翻译的文章（processing_status == "translating"）
         new_news_ids = [n.id for n in db.query(News).filter(
             News.id.in_(all_new_ids),
-            News.content_status == "pending"
+            News.processing_status == "translating"
         ).all()]
 
-        # 批量翻译标题
+        # 并行执行翻译和内容生成（它们互不依赖）
         if new_news_ids:
-            await emit("batch_start", batch_type="title_translation", count=len(new_news_ids), message=f"正在翻译 {len(new_news_ids)} 条标题...")
-            try:
-                title_success = await news_fetcher._translate_titles_for_news(db, new_news_ids)
-                await emit("batch_complete", batch_type="title_translation", success=title_success)
-            except Exception as e:
-                logger.error(f"Title translation error: {e}")
-                await emit("batch_complete", batch_type="title_translation", success=0, error=str(e)[:100])
+            # 更新阶段状态为翻译
+            current_fetch_task["current_stage"] = "translating"
 
-        # 批量生成内容
-        if new_news_ids:
-            await emit("batch_start", batch_type="content_generation", count=len(new_news_ids), message=f"正在精炼 {len(new_news_ids)} 条内容...")
-            try:
-                content_success = await news_fetcher.generate_content_for_news(db, new_news_ids, language="zh")
-                await emit("batch_complete", batch_type="content_generation", success=content_success)
-            except Exception as e:
-                logger.error(f"Content generation error: {e}")
-                await emit("batch_complete", batch_type="content_generation", success=0, error=str(e)[:100])
+            await emit("batch_start", batch_type="title_translation", count=len(new_news_ids), message=f"正在翻译 {len(new_news_ids)} 条标题...")
+
+            # 先执行翻译
+            async def translate_task():
+                try:
+                    return await news_fetcher._translate_titles_for_news(db, new_news_ids)
+                except Exception as e:
+                    logger.error(f"Title translation error: {e}")
+                    return None, str(e)[:100]
+
+            title_result = await translate_task()
+
+            # 发送翻译完成通知
+            if isinstance(title_result, tuple):
+                await emit("batch_complete", batch_type="title_translation", success=0, error=title_result[1])
+            else:
+                await emit("batch_complete", batch_type="title_translation", success=title_result or 0)
+
+            # 翻译完成后，更新 processing_status
+            # 翻译成功的进入 refining
+            translated_news = db.query(News).filter(
+                News.id.in_(new_news_ids),
+                News.title_status == "ready"
+            ).all()
+
+            translated_count = len(translated_news)
+            for news in translated_news:
+                news.processing_status = "refining"
+                await emit("status_change",
+                    news_id=news.id,
+                    old_status="translating",
+                    new_status="refining"
+                )
+
+            # 翻译失败的设为 failed（包括 pending 状态，因为 pending 表示等待重试）
+            failed_translation = db.query(News).filter(
+                News.id.in_(new_news_ids),
+                News.title_status.in_(["failed", "pending"])  # 添加 pending
+            ).all()
+
+            for news in failed_translation:
+                news.processing_status = "failed"
+                error_msg = news.title_last_error or "Title translation failed or pending retry"
+                await emit("status_change",
+                    news_id=news.id,
+                    old_status="translating",
+                    new_status="failed",
+                    error=error_msg
+                )
+
+            db.commit()
+
+            # 更新阶段状态为精炼
+            current_fetch_task["current_stage"] = "refining"
+
+            # 获取需要精炼的文章ID
+            refining_news_ids = [n.id for n in translated_news]
+
+            if refining_news_ids:
+                await emit("batch_start", batch_type="content_generation", count=len(refining_news_ids), message=f"正在精炼 {len(refining_news_ids)} 条内容...")
+
+                async def content_task():
+                    try:
+                        return await news_fetcher.generate_content_for_news(db, refining_news_ids, language="zh")
+                    except Exception as e:
+                        logger.error(f"Content generation error: {e}")
+                        return None, str(e)[:100]
+
+                content_result = await content_task()
+
+                if isinstance(content_result, tuple):
+                    await emit("batch_complete", batch_type="content_generation", success=0, error=content_result[1])
+                else:
+                    await emit("batch_complete", batch_type="content_generation", success=content_result or 0)
+
+                # 精炼完成后，更新 processing_status
+                # 成功的设为 ready
+                refined_news = db.query(News).filter(
+                    News.id.in_(refining_news_ids),
+                    News.content_status == "ready"
+                ).all()
+
+                for news in refined_news:
+                    news.processing_status = "ready"
+                    await emit("status_change",
+                        news_id=news.id,
+                        old_status="refining",
+                        new_status="ready"
+                    )
+
+                # 失败的设为 failed（包括 pending 状态，因为 pending 表示等待重试）
+                failed_news = db.query(News).filter(
+                    News.id.in_(refining_news_ids),
+                    News.content_status.in_(["failed", "pending"])  # 添加 pending
+                ).all()
+
+                for news in failed_news:
+                    news.processing_status = "failed"
+                    error_msg = news.glm_last_error or "Content generation failed or pending retry"
+                    await emit("status_change",
+                        news_id=news.id,
+                        old_status="refining",
+                        new_status="failed",
+                        error=error_msg
+                    )
+
+                db.commit()
+
+        # 检查是否所有文章都处于终态（ready/failed）
+        # 只有全部完成才发送 complete 事件
+        if all_new_ids:
+            still_processing = db.query(News).filter(
+                News.id.in_(all_new_ids),
+                News.processing_status.in_(['fetching', 'verifying', 'translating', 'refining'])
+            ).count()
+
+            if still_processing > 0:
+                logger.warning(f"Still processing {still_processing} articles, waiting...")
+                # 等待处理完成（最多等待 5 分钟）
+                for _ in range(60):  # 60 * 5秒 = 5分钟
+                    await asyncio.sleep(5)
+                    still_processing = db.query(News).filter(
+                        News.id.in_(all_new_ids),
+                        News.processing_status.in_(['fetching', 'verifying', 'translating', 'refining'])
+                    ).count()
+                    if still_processing == 0:
+                        break
+                    await emit("heartbeat", still_processing=still_processing)
+
+        # 重新统计最终结果
+        final_ready = db.query(News).filter(
+            News.id.in_(all_new_ids),
+            News.processing_status == "ready"
+        ).count() if all_new_ids else 0
+
+        final_failed = db.query(News).filter(
+            News.id.in_(all_new_ids),
+            News.processing_status == "failed"
+        ).count() if all_new_ids else 0
 
         # 更新 fetch 历史
         if fetch_history:
             fetch_history.status = "completed"
             fetch_history.completed_at = datetime.now(timezone.utc)
             fetch_history.articles_found = len(all_articles)
-            fetch_history.articles_new = new_count
-            fetch_history.articles_filtered = filtered_count
+            # 新增 = 成功处理的数量
+            fetch_history.articles_new = final_ready
+            fetch_history.articles_filtered = filtered_count + final_failed
             db.commit()
 
-        await emit("complete", success=True, new_count=new_count,
-                   duplicate_count=duplicate_count, filtered_count=filtered_count,
+        await emit("complete", success=True,
+                   translated_count=final_ready,
+                   new_count=final_ready,
+                   failed_count=final_failed,
+                   duplicate_count=duplicate_count,
+                   filtered_count=filtered_count,
                    total=len(all_articles))
+
+        # 完成，更新全局状态
+        current_fetch_task["is_running"] = False
+        current_fetch_task["current_stage"] = None
 
         logger.info(f"Dev fetch completed: {new_count} new, {duplicate_count} duplicates, {filtered_count} filtered")
 
     except Exception as e:
         logger.error(f"Fetch error: {e}", exc_info=True)
         await emit("error", message=str(e)[:200])
+
+        # 错误，更新全局状态
+        current_fetch_task["is_running"] = False
+        current_fetch_task["current_stage"] = None
+        current_fetch_task["last_error"] = str(e)[:200]
 
         if fetch_history:
             fetch_history.status = "failed"

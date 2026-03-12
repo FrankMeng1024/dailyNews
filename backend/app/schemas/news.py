@@ -44,6 +44,11 @@ class NewsResponse(BaseModel):
     is_verified: bool = False  # Whether source is verified
     ai_relevance_score: Optional[float] = None  # AI relevance score (0-1)
 
+    # Processing status fields
+    processing_status: str = "fetching"  # fetching/verifying/translating/refining/ready/failed
+    verification_status: str = "pending"  # pending/verifying/verified/failed
+    verification_score: Optional[float] = None  # Verification confidence score (0-1)
+
     @field_serializer('published_at')
     def serialize_published_at(self, v: datetime) -> str:
         if v:
