@@ -22,7 +22,6 @@ from app.database import init_db, SessionLocal
 from app.api.v1.router import api_router
 from app.services.scheduler_service import scheduler_service
 from app.services.tts_service import tts_service
-from app.services.content_retry_service import content_retry_service
 
 
 @asynccontextmanager
@@ -54,15 +53,22 @@ async def lifespan(app: FastAPI):
         logger.error(f"TTS preview generation failed: {e}")
         logger.warning("Application starting without TTS previews")
 
-    # Startup healing for content retry
-    try:
-        db = SessionLocal()
-        healing_result = await content_retry_service.startup_healing(db)
-        db.close()
-        logger.info(f"Content retry healing completed: {healing_result}")
-    except Exception as e:
-        logger.error(f"Content retry healing failed: {e}")
-        logger.warning("Application starting without healing")
+    # ========== STARTUP HEALING DISABLED ==========
+    # Temporarily disabled for architecture redesign.
+    # Will be replaced by the new state machine based recovery system.
+    # See: /Users/mzm/.claude/plans/merry-giggling-octopus.md
+
+    # # Startup healing for content retry
+    # try:
+    #     db = SessionLocal()
+    #     healing_result = await content_retry_service.startup_healing(db)
+    #     db.close()
+    #     logger.info(f"Content retry healing completed: {healing_result}")
+    # except Exception as e:
+    #     logger.error(f"Content retry healing failed: {e}")
+    #     logger.warning("Application starting without healing")
+
+    logger.info("Startup healing DISABLED for architecture redesign")
 
     yield
 

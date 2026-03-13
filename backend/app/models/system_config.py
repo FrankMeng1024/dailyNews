@@ -23,27 +23,33 @@ class FetchHistory(Base):
     __tablename__ = "fetch_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    fetch_type = Column(String(32), index=True, comment="Type: rss/newsapi/manual")
-    source_name = Column(String(128), index=True, comment="Source identifier")
-    started_at = Column(TZDateTime, nullable=False, comment="Fetch start time")
-    completed_at = Column(TZDateTime, comment="Fetch completion time")
-    status = Column(String(32), default="running", comment="running/completed/failed")
-    articles_found = Column(Integer, default=0, comment="Articles found")
-    articles_new = Column(Integer, default=0, comment="New articles added")
-    articles_filtered = Column(Integer, default=0, comment="Articles filtered by quality")
-    error_message = Column(Text, comment="Error message if failed")
-    fetch_metadata = Column(JSON, comment="Additional metadata")
+    task_id = Column(String(64), unique=True, index=True, comment="UUID for this fetch task")
 
-    def mark_completed(self, articles_found: int, articles_new: int, articles_filtered: int = 0):
+    # 统计
+    found_count = Column(Integer, default=0, comment="Articles found (created news)")
+    new_count = Column(Integer, default=0, comment="New articles (became active)")
+    skip_count = Column(Integer, default=0, comment="Skipped articles (became skip)")
+    failed_count = Column(Integer, default=0, comment="Failed articles (became failed)")
+
+    # 状态
+    status = Column(String(32), default="running", index=True, comment="running/completed/failed")
+    error_message = Column(Text, comment="Error message if failed")
+
+    # 时间
+    started_at = Column(TZDateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(TZDateTime, comment="Fetch completion time")
+
+    def mark_completed(self, found: int = 0, new: int = 0, skip: int = 0, failed: int = 0):
         """Mark fetch as completed"""
         self.completed_at = datetime.now(timezone.utc)
         self.status = "completed"
-        self.articles_found = articles_found
-        self.articles_new = articles_new
-        self.articles_filtered = articles_filtered
+        self.found_count = found
+        self.new_count = new
+        self.skip_count = skip
+        self.failed_count = failed
 
     def mark_failed(self, error: str):
         """Mark fetch as failed"""
         self.completed_at = datetime.now(timezone.utc)
         self.status = "failed"
-        self.error_message = error
+        self.error_message = error[:500] if error else None

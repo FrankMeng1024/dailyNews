@@ -4,21 +4,16 @@ from sqlalchemy import desc
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import uuid
-import asyncio
 import logging
 
-from app.database import get_db, SessionLocal
+from app.database import get_db
 from app.database_utils import async_safe_db_session
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.news import News
-from app.models.settings import UserSettings
-from app.schemas.news import NewsResponse, NewsListResponse, NewsFetchResponse
-from app.services.news_fetcher import news_fetcher
-from app.services.glm_service import glm_service
+from app.schemas.news import NewsResponse, NewsListResponse
 from app.services.task_store import create_task, update_task, get_task
 from app.services.config_service import ConfigService
-from app.utils.async_utils import create_safe_task
 
 logger = logging.getLogger(__name__)
 
@@ -42,18 +37,13 @@ async def list_news(
     Otherwise uses min_score if provided
     source_type filters by content type (news/blog/paper/discussion)
 
-    Shows news in 'refining' or 'ready' processing_status
+    Only shows news with visibility_status = 'active'
     """
     query = db.query(News)
 
-    # IMPORTANT: Only show articles in 'refining' or 'ready' status
-    # 'refining' = 翻译完成，正在生成精炼内容（此时出现在 news list）
-    # 'ready' = 全部完成
-    query = query.filter(News.processing_status.in_(['refining', 'ready']))
-
-    # IMPORTANT: Only show articles with Chinese title (title translation succeeded)
-    # This ensures users never see English titles
-    query = query.filter(News.title_zh.isnot(None))
+    # IMPORTANT: Only show articles with visibility_status = 'active'
+    # This means translation is complete and article is ready for display
+    query = query.filter(News.visibility_status == 'active')
 
     # Source type filtering
     if source_type and source_type != 'all':
@@ -64,9 +54,9 @@ async def list_news(
         from app.services.quality_threshold_manager import QualityThresholdManager
         thresholds = QualityThresholdManager.get_thresholds(db)
         min_threshold = thresholds.get(quality_level, 0.0)
-        query = query.filter(News.final_score >= min_threshold)
+        query = query.filter(News.quality_score >= min_threshold)
     elif min_score is not None:
-        query = query.filter(News.final_score >= min_score)
+        query = query.filter(News.quality_score >= min_score)
 
     if date_from:
         query = query.filter(News.published_at >= date_from)
@@ -100,23 +90,23 @@ async def get_today_news(
     db: Session = Depends(get_db)
 ):
     """
-    Get today's news articles
+    Get today's news articles (visibility_status = 'active')
     """
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
-    query = db.query(News).filter(News.fetched_at >= today_start)
+    query = db.query(News).filter(News.created_at >= today_start)
 
-    # Only show articles in 'refining' or 'ready' status
-    query = query.filter(News.processing_status.in_(['refining', 'ready']))
+    # Only show active articles
+    query = query.filter(News.visibility_status == 'active')
 
     # Only show articles with Chinese title
     query = query.filter(News.title_zh.isnot(None))
 
     if min_score is not None:
-        query = query.filter(News.final_score >= min_score)
+        query = query.filter(News.quality_score >= min_score)
 
     total = query.count()
-    news_list = query.order_by(desc(News.final_score)).limit(limit).all()
+    news_list = query.order_by(desc(News.quality_score)).limit(limit).all()
 
     return NewsListResponse(
         items=[NewsResponse.model_validate(n) for n in news_list],
@@ -142,20 +132,18 @@ async def get_fetch_status(task_id: str):
 async def start_fetch_news(
     background_tasks: BackgroundTasks,
     force: bool = Query(False, description="Force fetch even if recently fetched"),
-    quick: bool = Query(False, description="Quick mode: skip GLM content generation"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Start a background fetch task. Returns task_id for polling status.
-    quick=True (default): Fast fetch without AI summaries
-    quick=False: Full fetch with GLM content generation (slower)
+    Start a background fetch task using new pipeline architecture.
+    Returns task_id for polling status.
     """
     # Check last fetch time (prevent abuse)
     if not force:
-        last_news = db.query(News).order_by(desc(News.fetched_at)).first()
-        if last_news and last_news.fetched_at:
-            time_since_fetch = datetime.now(timezone.utc) - last_news.fetched_at
+        last_news = db.query(News).order_by(desc(News.created_at)).first()
+        if last_news and last_news.created_at:
+            time_since_fetch = datetime.now(timezone.utc) - last_news.created_at
             if time_since_fetch < timedelta(minutes=5):
                 return {
                     "task_id": None,
@@ -167,17 +155,10 @@ async def start_fetch_news(
     task_id = str(uuid.uuid4())
     create_task(task_id)
 
-    # Get user settings for language
-    user_settings = db.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
-    language = user_settings.audio_language if user_settings else "zh"
-
-    # Run in background
+    # Run in background using new pipeline
     background_tasks.add_task(
         do_fetch_news_background,
-        task_id=task_id,
-        user_id=current_user.id,
-        language=language,
-        skip_glm=quick
+        task_id=task_id
     )
 
     return {
@@ -193,7 +174,7 @@ async def get_refine_status(
     db: Session = Depends(get_db)
 ):
     """
-    Get the refine (GLM content generation) status of a news item.
+    Get the processing status of a news item.
     Used by frontend to poll for content updates.
     """
     news = db.query(News).filter(News.id == news_id).first()
@@ -203,13 +184,15 @@ async def get_refine_status(
 
     return {
         "id": news.id,
-        "status": news.content_status or "pending",
         "processing_status": news.processing_status,
+        "visibility_status": news.visibility_status,
         "is_refining": news.processing_status == "refining",
-        "is_verified": news.verification_status == "verified",
+        "is_complete": news.processing_status == "complete",
+        "is_active": news.visibility_status == "active",
         "verification_score": float(news.verification_score) if news.verification_score else None,
         "content": news.content,
-        "has_content": bool(news.content and len(news.content) > ConfigService.get(db, "min_summary_length", 50))
+        "has_content": bool(news.content and len(news.content) > ConfigService.get(db, "min_summary_length", 50)),
+        "error": news.last_error if news.visibility_status == "failed" else None
     }
 
 
@@ -229,117 +212,85 @@ async def get_news_detail(
     return NewsResponse.model_validate(news)
 
 
-async def do_fetch_news_background(task_id: str, user_id: int, language: str, skip_glm: bool = True):
+async def do_fetch_news_background(task_id: str):
     """
-    Background task to fetch news and optionally generate GLM content
-    使用安全会话管理，确保数据库连接正确关闭
+    Background task to fetch news using new pipeline architecture
     """
     from app.models.system_config import FetchHistory
+    from app.services.pipeline import state_machine, register_handlers, basic_fetcher
 
     async with async_safe_db_session() as db:
         fetch_record = None
-        max_error_len = ConfigService.get(db, "max_error_message_length", 500)
 
         try:
             # Create fetch history record
             fetch_record = FetchHistory(
-                fetch_type="manual",
-                source_name="multi_source",
+                task_id=task_id,
                 started_at=datetime.now(timezone.utc),
                 status="running"
             )
             db.add(fetch_record)
             db.commit()
 
-            # Step 1: Connect to sources
-            update_task(task_id, status="running", progress=5, message="连接新闻源...")
+            update_task(task_id, status="running", progress=10, message="连接新闻源...")
 
-            # Step 2: Fetch from multiple sources
-            update_task(task_id, progress=15, message="获取 Hacker News...")
-            await asyncio.sleep(0.1)
+            # Ensure state machine is running
+            if not state_machine.is_running():
+                register_handlers()
+                await state_machine.start()
 
-            update_task(task_id, progress=25, message="获取 Reddit AI 版块...")
-            await asyncio.sleep(0.1)
+            update_task(task_id, progress=30, message="抓取新闻中...")
 
-            update_task(task_id, progress=35, message="获取 NewsAPI...")
+            # Fetch from all sources
+            articles = await basic_fetcher.fetch_all_sources(limit_per_source=15)
 
-            # Actually fetch news (always fast, GLM is async)
-            update_task(task_id, progress=45, message="抓取新闻中...")
+            update_task(task_id, progress=50, message=f"处理 {len(articles)} 篇文章...")
 
-            result = await news_fetcher.fetch_and_save_news(
-                db,
-                page_size=50,
-                language=language,
-                skip_glm=True  # Always skip GLM in fetch, do it async
-            )
+            if not articles:
+                update_task(task_id, status="completed", progress=100, message="没有新文章")
+                if fetch_record:
+                    fetch_record.status = "completed"
+                    fetch_record.completed_at = datetime.now(timezone.utc)
+                    fetch_record.found_count = 0
+                    fetch_record.new_count = 0
+                    db.commit()
+                return
 
-            update_task(task_id, progress=70, message="去重与整理...")
+            # Create news records
+            update_task(task_id, progress=70, message="保存新闻...")
+            news_ids = await basic_fetcher.create_news_records(articles)
 
-            # Handle tuple return (new_count, skipped_count, saved_ids, no_content_count)
-            if isinstance(result, tuple) and len(result) == 4:
-                new_count, skipped_count, saved_ids, no_content_count = result
-            elif isinstance(result, tuple) and len(result) == 3:
-                new_count, skipped_count, saved_ids = result
-                no_content_count = 0
-            elif isinstance(result, tuple):
-                new_count, skipped_count = result
-                saved_ids = []
-                no_content_count = 0
-            else:
-                new_count = result
-                skipped_count = 0
-                saved_ids = []
-                no_content_count = 0
-
-            # Step 3: Start async GLM content generation if not quick mode
-            if not skip_glm and saved_ids:
-                update_task(task_id, progress=75, message=f"后台生成摘要 ({len(saved_ids)} 条)...")
-                # 使用安全任务包装器，确保异常被捕获和记录
-                create_safe_task(
-                    generate_content_background(saved_ids, language),
-                    task_name="glm_content_generation"
-                )
-
-            # Step 4: Complete
-            update_task(task_id, progress=95, message="保存数据...")
-            await asyncio.sleep(0.2)
-
-            msg = f"完成！新增 {new_count} 条"
-            if skipped_count > 0:
-                msg += f"，跳过 {skipped_count} 条重复"
-            if no_content_count > 0:
-                msg += f"，{no_content_count} 条无法抓取原文"
-            if not skip_glm and saved_ids:
-                msg += f"，摘要后台生成中"
+            # Enqueue for processing
+            update_task(task_id, progress=85, message="加入处理队列...")
+            await state_machine.enqueue_batch(news_ids)
 
             # Update fetch history
             if fetch_record:
-                fetch_record.mark_completed(
-                    articles_found=new_count + skipped_count,
-                    articles_new=new_count,
-                    articles_filtered=skipped_count
-                )
+                fetch_record.status = "completed"
+                fetch_record.completed_at = datetime.now(timezone.utc)
+                fetch_record.found_count = len(articles)
+                fetch_record.new_count = len(news_ids)
                 db.commit()
 
             update_task(
                 task_id,
                 status="completed",
                 progress=100,
-                message=msg,
+                message=f"完成！新增 {len(news_ids)} 条，已加入处理队列",
                 result={
-                    "fetched_count": new_count,
-                    "skipped_count": skipped_count
+                    "fetched_count": len(news_ids),
+                    "total_found": len(articles)
                 }
             )
 
         except Exception as e:
-            # 记录完整错误信息
             error_msg = f"{type(e).__name__}: {str(e)}"
             logger.error(f"Fetch task {task_id} failed: {error_msg}", exc_info=True)
 
-            # Update fetch history on error
             if fetch_record:
-                fetch_record.mark_failed(error_msg[:max_error_len])
+                fetch_record.status = "failed"
+                fetch_record.error_message = error_msg[:500]
+                fetch_record.completed_at = datetime.now(timezone.utc)
                 db.commit()
 
             update_task(
@@ -348,14 +299,3 @@ async def do_fetch_news_background(task_id: str, user_id: int, language: str, sk
                 progress=0,
                 message=f"出错: {error_msg[:100]}"
             )
-
-
-async def generate_content_background(news_ids: list, language: str):
-    """Background task to generate GLM content for news items
-    使用安全会话管理，确保数据库连接正确关闭
-    """
-    async with async_safe_db_session() as db:
-        try:
-            await news_fetcher.generate_content_for_news(db, news_ids, language)
-        except Exception as e:
-            logger.error(f"Background GLM generation error: {e}", exc_info=True)

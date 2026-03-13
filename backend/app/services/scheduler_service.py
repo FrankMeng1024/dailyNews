@@ -1,9 +1,14 @@
+"""
+Scheduler Service - 定时任务调度
+
+注意：旧的自动重试任务已废弃，新架构使用状态机处理
+"""
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.jobstores.memory import MemoryJobStore
-from typing import List, Optional
-from datetime import datetime, timezone
+from typing import List
 import pytz
 import logging
 
@@ -29,35 +34,9 @@ class SchedulerService:
             self._is_running = True
             logger.info("Scheduler started")
 
-            # Add GLM retry job (runs every minute)
-            self.scheduler.add_job(
-                self._retry_glm_content_task,
-                trigger=IntervalTrigger(minutes=1),
-                id="glm_retry_task",
-                replace_existing=True,
-                name="Retry GLM content generation"
-            )
-            logger.info("Added GLM retry job (every 1 minute)")
-
-            # Add scraping retry job (runs every 5 minutes)
-            self.scheduler.add_job(
-                self._retry_scraping_task,
-                trigger=IntervalTrigger(minutes=5),
-                id="scraping_retry_task",
-                replace_existing=True,
-                name="Retry failed article scraping"
-            )
-            logger.info("Added scraping retry job (every 5 minutes)")
-
-            # Add title translation retry job (runs every 2 minutes)
-            self.scheduler.add_job(
-                self._retry_title_translation_task,
-                trigger=IntervalTrigger(minutes=2),
-                id="title_translation_retry_task",
-                replace_existing=True,
-                name="Retry failed title translations"
-            )
-            logger.info("Added title translation retry job (every 2 minutes)")
+            # 新架构使用状态机处理重试，不再需要定时任务
+            # 状态机会自动处理 visibility_status='failed' 的新闻
+            logger.info("Using state machine for retry handling (no scheduled retry jobs)")
 
     def shutdown(self):
         """Shutdown the scheduler"""
@@ -152,105 +131,33 @@ class SchedulerService:
 
     async def _fetch_news_task(self, user_id: int):
         """
-        Background task to fetch news for a user
+        Background task to fetch news for a user (使用新版状态机)
 
         Args:
             user_id: User ID
         """
         from app.database import SessionLocal
-        from app.services.news_fetcher import news_fetcher
-        from app.services.glm_service import glm_service
-        from app.models.news import News
+        from app.services.pipeline import state_machine, register_handlers, basic_fetcher
 
         logger.info(f"Starting scheduled news fetch for user {user_id}")
 
-        db = SessionLocal()
         try:
-            # Fetch news
-            fetched_count = await news_fetcher.fetch_and_save_news(db, page_size=50)
-            logger.info(f"Fetched {fetched_count} new articles")
+            # 确保状态机运行
+            if not state_machine.is_running():
+                register_handlers()
+                await state_machine.start()
 
-            # Score unscored news
-            if fetched_count > 0:
-                unscored_news = db.query(News).filter(News.glm_score == None).all()
-                if unscored_news:
-                    await glm_service.score_and_update_news(db, unscored_news)
-                    logger.info(f"Scored {len(unscored_news)} articles")
+            # 使用新版 basic_fetcher 抓取
+            articles = await basic_fetcher.fetch_all_sources(limit_per_source=10)
+            if articles:
+                news_ids = await basic_fetcher.create_news_records(articles)
+                await state_machine.enqueue_batch(news_ids)
+                logger.info(f"Fetched {len(articles)} articles, created {len(news_ids)} new records")
+            else:
+                logger.info("No new articles found")
 
         except Exception as e:
             logger.error(f"Error in scheduled fetch: {str(e)}")
-        finally:
-            db.close()
-
-    async def _retry_glm_content_task(self):
-        """
-        Background task to retry GLM content generation for failed news items.
-        Runs every minute, processes news where:
-        - content_status = 'pending'
-        - glm_next_retry_at <= now
-        - glm_retry_count < 5
-        """
-        from app.database import SessionLocal
-        from app.services.content_retry_service import content_retry_service
-
-        db = SessionLocal()
-        try:
-            # Use content_retry_service for consistent retry logic
-            result = await content_retry_service.process_pending_batch(db, batch_size=10, trigger_type="auto")
-
-            if result["processed"] > 0:
-                logger.info(f"Auto retry completed: {result['success']}/{result['processed']} succeeded")
-
-        except Exception as e:
-            logger.error(f"Error in GLM retry task: {str(e)}")
-        finally:
-            db.close()
-
-    async def _retry_scraping_task(self):
-        """
-        Background task to retry content scraping for articles with insufficient content.
-        Runs every 5 minutes, processes articles where:
-        - original_content length < 200 chars
-        - scraping_next_retry_at <= now
-        - scraping_retry_count < 5
-        """
-        from app.database import SessionLocal
-        from app.services.scraping_retry_service import scraping_retry_service
-
-        db = SessionLocal()
-        try:
-            result = await scraping_retry_service.process_pending_batch(db, batch_size=10)
-
-            if result["processed"] > 0:
-                logger.info(f"Scraping retry completed: {result['success']}/{result['processed']} succeeded")
-
-        except Exception as e:
-            logger.error(f"Error in scraping retry task: {str(e)}")
-        finally:
-            db.close()
-
-    async def _retry_title_translation_task(self):
-        """
-        Background task to retry title translation for articles with missing Chinese titles.
-        Runs every 2 minutes, processes articles where:
-        - title_status = 'pending'
-        - title_next_retry_at <= now
-        - title_retry_count < 5
-        """
-        from app.database import SessionLocal
-        from app.services.content_retry_service import content_retry_service
-
-        db = SessionLocal()
-        try:
-            result = await content_retry_service.process_pending_titles(db, batch_size=10)
-
-            if result["processed"] > 0:
-                logger.info(f"Title translation retry completed: {result['success']}/{result['processed']} succeeded")
-
-        except Exception as e:
-            logger.error(f"Error in title translation retry task: {str(e)}")
-        finally:
-            db.close()
 
 
 scheduler_service = SchedulerService()

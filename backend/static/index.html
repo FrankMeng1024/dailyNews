@@ -658,28 +658,9 @@
                     </div>
                 </div>
 
-                <!-- Source Status (compact) -->
-                <div id="source-status" style="display:none;margin-top:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
-                    <div class="source-item" data-source="hackernews" style="padding:6px 10px;background:var(--bg);border-radius:8px;border:none;">
-                        <span class="source-icon" style="font-size:12px;">⏳</span>
-                        <span class="source-name" style="font-size:12px;">HN</span>
-                        <span class="source-count" style="font-size:11px;">-</span>
-                    </div>
-                    <div class="source-item" data-source="reddit" style="padding:6px 10px;background:var(--bg);border-radius:8px;border:none;">
-                        <span class="source-icon" style="font-size:12px;">⏳</span>
-                        <span class="source-name" style="font-size:12px;">Reddit</span>
-                        <span class="source-count" style="font-size:11px;">-</span>
-                    </div>
-                    <div class="source-item" data-source="rss" style="padding:6px 10px;background:var(--bg);border-radius:8px;border:none;">
-                        <span class="source-icon" style="font-size:12px;">⏳</span>
-                        <span class="source-name" style="font-size:12px;">RSS</span>
-                        <span class="source-count" style="font-size:11px;">-</span>
-                    </div>
-                    <div class="source-item" data-source="newsapi" style="padding:6px 10px;background:var(--bg);border-radius:8px;border:none;">
-                        <span class="source-icon" style="font-size:12px;">⏳</span>
-                        <span class="source-name" style="font-size:12px;">NewsAPI</span>
-                        <span class="source-count" style="font-size:11px;">-</span>
-                    </div>
+                <!-- Source Status - 简化显示（新架构不再提供实时源状态） -->
+                <div id="source-status" style="display:none;margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;text-align:center;">
+                    <span style="font-size:12px;color:var(--text2);">正在从 HN、Reddit、RSS、NewsAPI 抓取...</span>
                 </div>
             </div>
 
@@ -694,17 +675,19 @@
                     </div>
                 </div>
 
-                <!-- Status Legend - 单一状态流程 -->
+                <!-- Status Legend - 单一状态流程 (新版状态机) -->
                 <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-bottom:8px;padding:6px 8px;background:var(--bg);border-radius:6px;flex-wrap:wrap;">
-                    <span class="status-tag fetching" style="font-size:9px;padding:2px 6px;">抓取中</span>
+                    <span class="status-tag fetching" style="font-size:9px;padding:2px 6px;">created</span>
                     <span style="color:var(--text2);">→</span>
-                    <span class="status-tag verifying" style="font-size:9px;padding:2px 6px;">验证中</span>
+                    <span class="status-tag fetching" style="font-size:9px;padding:2px 6px;">fetching</span>
                     <span style="color:var(--text2);">→</span>
-                    <span class="status-tag translating" style="font-size:9px;padding:2px 6px;">翻译中</span>
+                    <span class="status-tag verifying" style="font-size:9px;padding:2px 6px;">verifying</span>
                     <span style="color:var(--text2);">→</span>
-                    <span class="status-tag refining" style="font-size:9px;padding:2px 6px;">精炼中</span>
+                    <span class="status-tag translating" style="font-size:9px;padding:2px 6px;">translating</span>
                     <span style="color:var(--text2);">→</span>
-                    <span class="status-tag ready" style="font-size:9px;padding:2px 6px;">完成</span>
+                    <span class="status-tag refining" style="font-size:9px;padding:2px 6px;">refining</span>
+                    <span style="color:var(--text2);">→</span>
+                    <span class="status-tag ready" style="font-size:9px;padding:2px 6px;">complete</span>
                 </div>
 
                 <!-- Live List -->
@@ -1238,6 +1221,11 @@
                 document.querySelectorAll('.tab')[tabIndex].classList.add('active');
             }
 
+            // Refresh news list when entering news page
+            if (name === 'news') {
+                loadNews();
+            }
+
             // Load retry page data if entering retry page
             if (name === 'retry') {
                 restoreAdminState(); // 恢复状态（包括按钮、列表、统计）
@@ -1251,7 +1239,7 @@
             }
         }
 
-        // 加载最近的文章状态（用于重新进入页面时显示）- 使用统一状态
+        // 加载最近的文章状态（用于重新进入页面时显示）- 使用新版 v2 API
         async function loadRecentArticles() {
             const code = localStorage.getItem('creatorCode');
             if (!code) return;
@@ -1260,7 +1248,8 @@
             if (!list) return;
 
             try {
-                const response = await fetch('/api/v1/admin/retry-list?limit=30', {
+                // 使用新版 v2 API 获取失败列表
+                const response = await fetch('/api/v1/admin/failed-list?limit=30', {
                     headers: { 'X-Creator-Code': code }
                 });
 
@@ -1272,13 +1261,14 @@
                     return;
                 }
 
-                // 使用统一状态显示
+                // 使用新版状态显示
                 liveArticlesData = data.items.map(item => ({
                     title: item.title || item.title_zh || '无标题',
                     source: item.source_name,
-                    processingStatus: item.processing_status || 'fetching',
-                    isVerified: item.verification_status === 'verified',
-                    newsId: item.id
+                    processingStatus: item.processing_status || 'created',
+                    isVerified: false,
+                    newsId: item.id,
+                    error: item.last_error
                 }));
                 liveArticlesCount = liveArticlesData.length;
 
@@ -1314,25 +1304,12 @@
                     const progressContainer = document.getElementById('fetch-progress-container');
                     const sourceStatus = document.getElementById('source-status');
                     if (progressContainer) progressContainer.style.display = 'block';
-                    if (sourceStatus) sourceStatus.style.display = 'grid';
+                    if (sourceStatus) sourceStatus.style.display = 'block';
 
                     // 尝试重新连接 SSE
                     if (state.task_id) {
                         reconnectSSE(state.task_id);
                     }
-                }
-
-                // 恢复信息源卡片状态
-                if (state.source_status) {
-                    Object.entries(state.source_status).forEach(([source, status]) => {
-                        if (status.status === 'done') {
-                            updateSourceStatus(source, 'done', status.fetched || 0, status.saved || 0);
-                        } else if (status.status === 'loading') {
-                            updateSourceStatus(source, 'loading');
-                        } else if (status.status === 'error') {
-                            updateSourceStatus(source, 'error');
-                        }
-                    });
                 }
 
                 // 恢复新闻列表
@@ -1504,9 +1481,10 @@
             list.innerHTML = currentNews.map((n, i) => {
                 const sourceType = n.source_type || 'news';
                 const icon = getSourceTypeIcon(sourceType);
-                const isVerified = n.verification_status === 'verified' || n.is_verified || false;
+                // 新版状态机: 使用 verification_score 判断是否已验证
+                const isVerified = (n.verification_score && n.verification_score > 0.5) || n.is_verified || false;
                 const isRefining = n.processing_status === 'refining';
-                const isHot = (n.final_score || 0) > 0.8;
+                const isHot = (n.quality_score || 0) > 0.8;
 
                 return `
                 <div class="news-card" onclick="showDetail(${i})">
@@ -1575,7 +1553,8 @@
             const icon = getSourceTypeIcon(sourceType);
             const typeName = getSourceTypeName(sourceType);
             const typeColor = getSourceTypeColor(sourceType);
-            const isVerified = n.verification_status === 'verified' || n.is_verified || false;
+            // 新版状态机: 使用 verification_score 判断是否已验证
+            const isVerified = (n.verification_score && n.verification_score > 0.5) || n.is_verified || false;
             const isRefining = n.processing_status === 'refining';
 
             // Store for tab switching
@@ -1933,24 +1912,29 @@
                 `<option value="${v.id}" ${i === 0 ? 'selected' : ''}>${v.name} - ${v.desc}</option>`
             ).join('');
 
-            // Filter news: only show ready ones as selectable, others as disabled
-            const readyNews = currentNews.filter(n => n.content_status === 'ready');
+            // Filter news: only show active ones as selectable, others as disabled
+            // 新版状态机: visibility_status === 'active' 表示已完成
+            const readyNews = currentNews.filter(n => n.visibility_status === 'active');
 
             document.getElementById('ready-count').textContent = `${readyNews.length} 篇可用 (最多选20篇)`;
 
             let html = '';
             // Show all news (selectable up to 20)
             currentNews.forEach((n, i) => {
-                const isReady = n.content_status === 'ready';
-                const statusText = n.content_status === 'pending' ? '精炼中...' :
-                                   n.content_status === 'generating' ? '生成中...' :
-                                   n.content_status === 'failed' ? '精炼失败' : '';
+                const isReady = n.visibility_status === 'active';
+                // 新版状态机状态文本
+                const statusText = n.visibility_status === 'failed' ? '处理失败' :
+                                   n.processing_status === 'refining' ? '精炼中...' :
+                                   n.processing_status === 'translating' ? '翻译中...' :
+                                   n.processing_status === 'verifying' ? '验证中...' :
+                                   n.processing_status === 'fetching' ? '抓取中...' :
+                                   n.processing_status === 'created' ? '待处理' : '';
                 html += `
                 <div class="select-item ${!isReady ? 'disabled' : ''}" onclick="${isReady ? `toggleSelect(${i})` : ''}">
                     <div id="check-${i}" class="checkbox ${!isReady ? 'disabled' : ''}"></div>
                     <div style="flex:1;min-width:0">
                         <div style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${!isReady ? 'color:var(--text2)' : ''}">${n.title_zh || n.title}</div>
-                        <div style="font-size:12px;color:var(--text2)">${n.source_name}${statusText ? ' · <span style="color:' + (n.content_status === 'failed' ? '#ff3b30' : 'var(--primary)') + '">' + statusText + '</span>' : ''}</div>
+                        <div style="font-size:12px;color:var(--text2)">${n.source_name}${statusText ? ' · <span style="color:' + (n.visibility_status === 'failed' ? '#ff3b30' : 'var(--primary)') + '">' + statusText + '</span>' : ''}</div>
                     </div>
                 </div>`;
             });
@@ -1982,8 +1966,8 @@
         }
 
         function selectAllNews() {
-            // Get first 20 ready news items
-            const readyNews = currentNews.filter(n => n.content_status === 'ready').slice(0, 20);
+            // Get first 20 ready news items (新版状态机: visibility_status === 'active')
+            const readyNews = currentNews.filter(n => n.visibility_status === 'active').slice(0, 20);
             const readyIds = readyNews.map(n => n.id);
 
             if (selectedNews.length === readyIds.length && readyIds.every(id => selectedNews.includes(id))) {
@@ -2007,7 +1991,8 @@
         }
 
         function updateSelectAllBtn() {
-            const readyNews = currentNews.filter(n => n.content_status === 'ready').slice(0, 20);
+            // 新版状态机: visibility_status === 'active'
+            const readyNews = currentNews.filter(n => n.visibility_status === 'active').slice(0, 20);
             const btn = document.getElementById('select-all-btn');
             if (btn) {
                 const allSelected = readyNews.length > 0 && readyNews.every(n => selectedNews.includes(n.id));
@@ -2463,7 +2448,8 @@
             if (statFailed) statFailed.textContent = '...';
 
             try {
-                const response = await fetch('/api/v1/admin/content-status', {
+                // 使用新版 v2 API 获取统计
+                const response = await fetch('/api/v1/admin/stats', {
                     headers: { 'X-Creator-Code': code }
                 });
 
@@ -2477,19 +2463,27 @@
                 }
 
                 const data = await response.json();
-                if (!data || !data.status_counts) {
-                    console.log('No status_counts in response');
+                if (!data) {
+                    console.log('No data in response');
                     return;
                 }
 
-                // Update dashboard stats
-                const counts = data.status_counts;
-                const total = (counts.ready || 0) + (counts.pending || 0) + (counts.failed || 0) + (counts.generating || 0);
+                // 使用新版状态统计
+                const processing = data.processing || {};
+                const visibility = data.visibility || {};
+                const total = data.total || 0;
+
+                // 计算各状态数量
+                const successCount = visibility.active || 0;
+                const pendingCount = (processing.created || 0) + (processing.fetching || 0) +
+                                    (processing.verifying || 0) + (processing.translating || 0) +
+                                    (processing.refining || 0);
+                const failedCount = visibility.failed || 0;
 
                 if (statTotal) statTotal.textContent = total;
-                if (statSuccess) statSuccess.textContent = counts.ready || 0;
-                if (statPending) statPending.textContent = (counts.pending || 0) + (counts.generating || 0);
-                if (statFailed) statFailed.textContent = counts.failed || 0;
+                if (statSuccess) statSuccess.textContent = successCount;
+                if (statPending) statPending.textContent = pendingCount;
+                if (statFailed) statFailed.textContent = failedCount;
             } catch (e) {
                 console.error('Failed to load retry stats:', e);
                 // Show error state
@@ -2618,9 +2612,9 @@
                                     ${item.duration_seconds ? `<span style="font-size:11px;color:var(--text2);">· ${item.duration_seconds}秒</span>` : ''}
                                 </div>
                                 <div class="history-stats">
-                                    发现 ${item.articles_found || 0} 条 ·
-                                    <span class="history-success">新增 ${item.articles_new || 0}</span> ·
-                                    <span style="color:var(--text2);">过滤 ${item.articles_filtered || 0}</span>
+                                    发现 ${item.found_count || 0} 条 ·
+                                    <span class="history-success">新增 ${item.new_count || 0}</span> ·
+                                    <span style="color:var(--text2);">过滤 ${item.skip_count || 0}</span>
                                 </div>
                                 ${item.error_message ? `<div style="font-size:10px;color:#ef4444;margin-top:4px;">错误: ${item.error_message}</div>` : ''}
                             </div>
@@ -2829,8 +2823,7 @@
             }
         });
 
-        // ========== Dev Fetch SSE Functions ==========
-        let fetchEventSource = null;
+        // ========== Dev Fetch Functions ==========
         let liveArticlesCount = 0;
         let isFetching = false;
         let fetchTimeout = null;
@@ -2902,7 +2895,7 @@
                     const progressContainer = document.getElementById('fetch-progress-container');
                     const sourceStatus = document.getElementById('source-status');
                     if (progressContainer) progressContainer.style.display = 'block';
-                    if (sourceStatus) sourceStatus.style.display = 'grid';
+                    if (sourceStatus) sourceStatus.style.display = 'block';
                     // 尝试重新连接 SSE
                     if (data.task_id) {
                         reconnectSSE(data.task_id);
@@ -2914,37 +2907,6 @@
             } catch (e) {
                 console.error('Check fetch status error:', e);
             }
-        }
-
-        // 重新连接 SSE
-        function reconnectSSE(taskId) {
-            if (fetchEventSource) {
-                fetchEventSource.close();
-            }
-
-            fetchEventSource = new EventSource(`/api/v1/admin/fetch-stream/${taskId}`);
-
-            fetchEventSource.onmessage = (event) => {
-                try {
-                    const eventData = JSON.parse(event.data);
-                    handleFetchEvent(eventData);
-                } catch (e) {
-                    console.error('Parse SSE error:', e);
-                }
-            };
-
-            fetchEventSource.onerror = (e) => {
-                console.error('SSE reconnect error:', e);
-                if (fetchEventSource) {
-                    fetchEventSource.close();
-                    fetchEventSource = null;
-                }
-                // 检查任务是否已完成
-                checkFetchStatus();
-            };
-
-            // 启动超时保护
-            startFetchTimeout();
         }
 
         // 超时保护
@@ -3000,8 +2962,8 @@
             startFetchTimeout();
 
             try {
-                // 1. 启动 fetch 任务
-                const resp = await fetch('/api/v1/admin/fetch-news?force=true', {
+                // 1. 启动 fetch 任务 (使用新版 v2 API)
+                const resp = await fetch('/api/v1/admin/fetch-news-v2?limit_per_source=10', {
                     method: 'POST',
                     headers: { 'X-Creator-Code': code }
                 });
@@ -3017,27 +2979,12 @@
                     throw new Error(data.detail || data.message || '启动失败');
                 }
 
-                // 2. 订阅 SSE 流
-                fetchEventSource = new EventSource(`/api/v1/admin/fetch-stream/${data.task_id}`);
+                // 2. 立即刷新抓取历史，显示"进行中"状态
+                loadFetchHistory();
 
-                fetchEventSource.onmessage = (event) => {
-                    try {
-                        const eventData = JSON.parse(event.data);
-                        handleFetchEvent(eventData);
-                    } catch (e) {
-                        console.error('Parse SSE error:', e);
-                    }
-                };
-
-                fetchEventSource.onerror = (e) => {
-                    console.error('SSE error:', e);
-                    if (fetchEventSource) {
-                        fetchEventSource.close();
-                        fetchEventSource = null;
-                    }
-                    // 恢复按钮状态
-                    finishFetch(false, '连接中断');
-                };
+                // 3. 使用轮询检查任务状态（新版状态机不再使用 SSE）
+                updateFetchStatus('抓取中...', 10);
+                pollFetchStatus(data.task_id, code);
 
             } catch (e) {
                 console.error('Start fetch error:', e);
@@ -3045,167 +2992,110 @@
             }
         }
 
-        function handleFetchEvent(event) {
-            addFetchLog(event);
+        // 轮询任务状态 - 同时获取处理中的文章列表
+        async function pollFetchStatus(taskId, code) {
+            try {
+                // 并行获取任务状态和处理中的文章列表
+                const [statusResp, articlesResp, statsResp] = await Promise.all([
+                    fetch(`/api/v1/news/fetch/status/${taskId}`, {
+                        headers: { 'X-Creator-Code': code }
+                    }),
+                    fetch(`/api/v1/admin/processing-list?limit=50`, {
+                        headers: { 'X-Creator-Code': code }
+                    }),
+                    fetch(`/api/v1/admin/stats`, {
+                        headers: { 'X-Creator-Code': code }
+                    })
+                ]);
 
-            switch (event.type) {
-                case 'start':
-                    setButtonState('running', 'fetching');
-                    updateFetchStatus(event.message, 5);
-                    // 清空列表，准备接收新数据
-                    const list = document.getElementById('live-articles-list');
-                    if (list) list.innerHTML = '';
-                    liveArticlesData = [];
-                    liveArticlesCount = 0;
-                    sourceFetchCounts = {};
-                    sourceSaveCounts = {};
-                    const countEl = document.getElementById('live-articles-count');
-                    if (countEl) countEl.textContent = '0';
-                    break;
+                if (!statusResp.ok) {
+                    throw new Error(`HTTP ${statusResp.status}`);
+                }
 
-                case 'source_start':
-                    updateSourceStatus(event.source, 'loading');
-                    updateFetchStatus(event.message, getProgressForSource(event.source));
-                    break;
+                const status = await statusResp.json();
+                const articles = articlesResp.ok ? await articlesResp.json() : { items: [] };
+                const stats = statsResp.ok ? await statsResp.json() : null;
 
-                case 'source_complete':
-                    sourceFetchCounts[event.source] = event.count || 0;
-                    sourceSaveCounts[event.source] = 0;
-                    updateSourceStatus(event.source, 'done', event.count, 0);
-                    break;
+                // 更新实时文章列表
+                updateLiveArticlesList(articles.items || []);
 
-                case 'source_error':
-                    updateSourceStatus(event.source, 'error');
-                    break;
+                // 更新统计卡片
+                if (stats) {
+                    updateStatsDisplay(stats);
+                }
 
-                case 'processing':
-                    setButtonState('running', 'processing');
-                    updateFetchStatus(event.message, 70);
-                    break;
+                // 更新进度
+                updateFetchStatus(status.message || '处理中...', status.progress || 50);
 
-                case 'article_saved':
-                    // 新文章保存，使用统一状态
-                    const src = event.source || 'unknown';
-                    sourceSaveCounts[src] = (sourceSaveCounts[src] || 0) + 1;
-                    updateSourceStatus(src, 'done', sourceFetchCounts[src] || 0, sourceSaveCounts[src]);
-                    addLiveArticle(
-                        event.title,
-                        event.source,
-                        event.processing_status || 'fetching',
-                        event.is_verified || false,
-                        event.news_id,
-                        event.error || null
-                    );
-                    break;
+                // 定期刷新抓取历史（每次轮询都刷新，让用户看到实时状态）
+                loadFetchHistory();
 
-                case 'status_change':
-                    // 文章状态变更（携带 error 信息）
-                    updateLiveArticleStatus(event.news_id, event.new_status, event.is_verified, event.error || null);
-                    // 更新按钮状态
-                    if (event.new_status === 'verifying') {
-                        setButtonState('running', 'verifying');
-                    } else if (event.new_status === 'translating') {
-                        setButtonState('running', 'translating');
-                    } else if (event.new_status === 'refining') {
-                        setButtonState('running', 'refining');
+                // 计算处理中的文章数量
+                const processingCount = (articles.items || []).length;
+
+                // 判断是否完成：任务完成 + 无处理中文章 = 真正完成
+                if (status.status === 'completed') {
+                    if (processingCount === 0) {
+                        // 真正完成
+                        const result = status.result || {};
+                        updateFetchStatus(`完成！新增 ${result.fetched_count || 0} 条`, 100);
+                        finishFetch(true);
+                        loadNews();
+                        loadRetryStats();
+                    } else {
+                        // 抓取完成但还有文章在处理中，继续轮询
+                        setButtonState('running', 'processing');
+                        updateFetchStatus(`处理中... (${processingCount} 条待处理)`, 95);
+                        setTimeout(() => pollFetchStatus(taskId, code), 2000);
                     }
-                    break;
-
-                case 'verification_complete':
-                    // 验证完成
-                    updateLiveArticleStatus(event.news_id, 'translating', event.is_verified);
-                    break;
-
-                case 'batch_start':
-                    // 批量处理开始
-                    if (event.batch_type === 'verification') {
-                        setButtonState('running', 'verifying');
-                        updateAllArticleProcessingStatus('verifying');
-                        updateFetchStatus('验证新闻真实性...', 72);
-                    } else if (event.batch_type === 'title_translation') {
-                        setButtonState('running', 'translating');
-                        updateAllArticleProcessingStatus('translating');
-                        updateFetchStatus('翻译标题...', 80);
-                    } else if (event.batch_type === 'content_generation') {
-                        setButtonState('running', 'refining');
-                        updateAllArticleProcessingStatus('refining');
-                        updateFetchStatus('精炼内容...', 90);
-                    }
-                    break;
-
-                case 'batch_complete':
-                    // 批量处理完成
-                    if (event.batch_type === 'verification') {
-                        // 验证完成，更新验证状态
-                        if (event.verified_ids) {
-                            event.verified_ids.forEach(id => {
-                                const article = liveArticlesData.find(a => a.newsId === id);
-                                if (article) article.isVerified = true;
-                            });
-                        }
-                    } else if (event.batch_type === 'content_generation') {
-                        // 精炼完成，移除已完成的文章
-                        liveArticlesData = liveArticlesData.filter(a => a.processingStatus !== 'ready');
-                        liveArticlesCount = liveArticlesData.length;
-                        const countEl2 = document.getElementById('live-articles-count');
-                        if (countEl2) countEl2.textContent = liveArticlesCount;
-                    }
-                    renderLiveArticlesListFiltered();
-                    break;
-
-                case 'complete':
-                    // 使用 translated_count 作为新增数量
-                    const newCount = event.translated_count || event.new_count || 0;
-                    updateFetchStatus(`完成！新增 ${newCount} 条，过滤 ${event.filtered_count || event.duplicate_count || 0} 条`, 100);
-                    finishFetch(true);
-                    break;
-
-                case 'error':
-                    finishFetch(false, event.message);
-                    break;
-
-                case 'heartbeat':
-                    // 保持连接，重置超时
-                    startFetchTimeout();
-                    break;
+                } else if (status.status === 'failed') {
+                    // 失败
+                    finishFetch(false, status.message || '抓取失败');
+                } else {
+                    // 进行中，继续轮询
+                    setTimeout(() => pollFetchStatus(taskId, code), 1500);
+                }
+            } catch (e) {
+                console.error('Poll status error:', e);
+                finishFetch(false, '获取状态失败: ' + e.message);
             }
         }
 
-        // 更新所有文章的处理状态（统一状态）
-        function updateAllArticleProcessingStatus(newStatus) {
-            liveArticlesData.forEach(article => {
-                if (article.processingStatus !== 'failed' && article.processingStatus !== 'ready') {
-                    article.processingStatus = newStatus;
-                }
-            });
+        // 更新实时文章列表
+        function updateLiveArticlesList(items) {
+            liveArticlesData = items.map(item => ({
+                title: item.title || item.title_zh || '无标题',
+                source: item.source_name,
+                processingStatus: item.processing_status || 'created',
+                isVerified: false,
+                newsId: item.id
+            }));
+            liveArticlesCount = liveArticlesData.length;
+            const countEl = document.getElementById('live-articles-count');
+            if (countEl) countEl.textContent = liveArticlesCount;
             renderLiveArticlesListFiltered();
         }
 
-        function updateSourceStatus(source, status, fetchCount, saveCount) {
-            const item = document.querySelector(`.source-item[data-source="${source}"]`);
-            if (!item) return;
+        // 更新统计卡片显示
+        function updateStatsDisplay(stats) {
+            const processing = stats.processing || {};
+            const visibility = stats.visibility || {};
 
-            const icon = item.querySelector('.source-icon');
-            const countEl = item.querySelector('.source-count');
-            if (!icon || !countEl) return;
+            const statTotal = document.getElementById('stat-total');
+            const statSuccess = document.getElementById('stat-success');
+            const statPending = document.getElementById('stat-pending');
+            const statFailed = document.getElementById('stat-failed');
 
-            if (status === 'loading') {
-                icon.textContent = '🔄';
-                icon.classList.add('spinning');
-            } else if (status === 'done') {
-                icon.textContent = '✅';
-                icon.classList.remove('spinning');
-                // 显示 "抓取数 → 保存数" 格式
-                if (saveCount !== undefined && saveCount > 0) {
-                    countEl.textContent = `${fetchCount} → ${saveCount}`;
-                } else {
-                    countEl.textContent = fetchCount + ' 条';
-                }
-            } else if (status === 'error') {
-                icon.textContent = '❌';
-                icon.classList.remove('spinning');
-                countEl.textContent = '失败';
-            }
+            const successCount = visibility.active || 0;
+            const pendingCount = (processing.created || 0) + (processing.fetching || 0) +
+                                (processing.verifying || 0) + (processing.translating || 0) +
+                                (processing.refining || 0);
+            const failedCount = visibility.failed || 0;
+
+            if (statTotal) statTotal.textContent = stats.total || 0;
+            if (statSuccess) statSuccess.textContent = successCount;
+            if (statPending) statPending.textContent = pendingCount;
+            if (statFailed) statFailed.textContent = failedCount;
         }
 
         function updateFetchStatus(message, progress) {
@@ -3218,9 +3108,6 @@
         // 存储实时文章数据用于筛选
         let liveArticlesData = [];
         let currentLiveFilter = 'all';
-        // 跟踪每个 source 的抓取和保存数量
-        let sourceFetchCounts = {};
-        let sourceSaveCounts = {};
 
         function filterLiveList(filter) {
             currentLiveFilter = filter;
@@ -3262,13 +3149,15 @@
                 return;
             }
 
-            // 获取单一状态标签
+            // 获取单一状态标签 (新版状态机)
             const getStatusTag = (status, isVerified) => {
                 const statusMap = {
+                    'created': '<span class="status-tag fetching">待处理</span>',
                     'fetching': '<span class="status-tag fetching">抓取中</span>',
                     'verifying': '<span class="status-tag verifying">验证中</span>',
                     'translating': '<span class="status-tag translating">翻译中</span>',
                     'refining': '<span class="status-tag refining">精炼中</span>',
+                    'complete': '<span class="status-tag ready">完成</span>',
                     'ready': '<span class="status-tag ready">完成</span>',
                     'failed': '<span class="status-tag failed">失败</span>'
                 };
@@ -3351,7 +3240,8 @@
             }
 
             try {
-                const response = await fetch(`/api/v1/admin/retry-single?news_id=${newsId}`, {
+                // 使用新版 v2 API 重试
+                const response = await fetch(`/api/v1/admin/retry/${newsId}`, {
                     method: 'POST',
                     headers: { 'X-Creator-Code': code }
                 });
@@ -3361,12 +3251,12 @@
                     // 更新本地状态
                     const article = liveArticlesData.find(a => a.newsId === newsId);
                     if (article) {
-                        article.processingStatus = 'fetching';
+                        article.processingStatus = 'created';
                         article.error = null;
                         renderLiveArticlesListFiltered();
                     }
                 } else {
-                    showToast(result.message || '重试失败');
+                    showToast(result.message || result.detail || '重试失败');
                     // 恢复按钮状态
                     if (btn) {
                         btn.disabled = false;
@@ -3385,7 +3275,7 @@
             }
         }
 
-        // 重试全部失败
+        // 重试全部失败 (使用新版 v2 API)
         async function retryAllFailed() {
             const code = localStorage.getItem('creatorCode');
             if (!code) {
@@ -3400,24 +3290,17 @@
             }
 
             try {
-                // 先重置所有失败状态
-                await fetch('/api/v1/admin/reset-all-failed', {
-                    method: 'POST',
-                    headers: { 'X-Creator-Code': code }
-                });
-
-                // 然后触发重试
-                const response = await fetch('/api/v1/admin/retry-all-pending', {
+                const response = await fetch('/api/v1/admin/retry-all-failed', {
                     method: 'POST',
                     headers: { 'X-Creator-Code': code }
                 });
                 const result = await response.json();
-                showToast(`已触发重试 ${result.processed || 0} 条`);
+                showToast(`已触发重试 ${result.retried_count || 0} 条`);
 
                 // 更新本地状态
                 liveArticlesData.forEach(a => {
                     if (a.processingStatus === 'failed') {
-                        a.processingStatus = 'fetching';
+                        a.processingStatus = 'created';
                         a.error = null;
                     }
                 });
@@ -3486,11 +3369,6 @@
                 if (statusText) statusText.textContent = '错误: ' + errorMsg;
             }
 
-            if (fetchEventSource) {
-                fetchEventSource.close();
-                fetchEventSource = null;
-            }
-
             // 刷新数据
             if (success) {
                 refreshRetryList();
@@ -3519,17 +3397,6 @@
                 statusIcon.classList.add('spinning');
             }
             if (statusText) statusText.textContent = '准备中...';
-
-            // 重置源状态
-            document.querySelectorAll('.source-item').forEach(item => {
-                const icon = item.querySelector('.source-icon');
-                const count = item.querySelector('.source-count');
-                if (icon) {
-                    icon.textContent = '⏳';
-                    icon.classList.remove('spinning');
-                }
-                if (count) count.textContent = '-';
-            });
         }
 
         function toggleFetchLog() {

@@ -7,6 +7,7 @@
     python clear_data.py --news   # 只清除新闻数据
     python clear_data.py --audio  # 只清除音频数据
     python clear_data.py --all    # 清除所有数据
+    python clear_data.py --history # 只清除历史记录
 """
 import sys
 import os
@@ -39,12 +40,12 @@ def clear_audio(db):
     if table_exists("audio_news"):
         db.execute(text("DELETE FROM audio_news"))
         cleared = True
-    if table_exists("audio"):
-        db.execute(text("DELETE FROM audio"))
+        print("✓ 已清除 audio_news 表")
+    if table_exists("audio_recordings"):
+        db.execute(text("DELETE FROM audio_recordings"))
         cleared = True
-    if cleared:
-        print("✓ 已清除 audio 相关表")
-    else:
+        print("✓ 已清除 audio_recordings 表")
+    if not cleared:
         print("- audio 表不存在，跳过")
 
 
@@ -57,12 +58,28 @@ def clear_fetch_history(db):
         print("- fetch_history 表不存在，跳过")
 
 
+def clear_retry_history(db):
+    """清除重试历史"""
+    if table_exists("retry_history"):
+        db.execute(text("DELETE FROM retry_history"))
+        print("✓ 已清除 retry_history 表")
+    else:
+        print("- retry_history 表不存在，跳过")
+
+
+def clear_history(db):
+    """清除所有历史记录"""
+    clear_fetch_history(db)
+    clear_retry_history(db)
+
+
 def clear_all(db):
     """清除所有数据"""
     # 按依赖顺序删除
     clear_audio(db)
-    clear_fetch_history(db)
+    clear_history(db)
     clear_news(db)
+    print("\n所有数据已清除")
 
 
 def main():
@@ -74,10 +91,12 @@ def main():
             clear_news(db)
         elif '--audio' in args:
             clear_audio(db)
+        elif '--history' in args:
+            clear_history(db)
         elif '--all' in args or not args:
             clear_all(db)
         else:
-            print("用法: python clear_data.py [--news|--audio|--all]")
+            print("用法: python clear_data.py [--news|--audio|--history|--all]")
             return
 
         db.commit()

@@ -391,7 +391,7 @@ Summary:"""
             content_preview = content[:2000] if content else ""
             news_content.append(f"新闻 {i+1}: {news.title}\n{content_preview}")
             # Debug logging
-            logger.info(f"[Dialogue] News {i+1}: title={news.title[:50]}, content_status={news.content_status}, content_len={len(content)}")
+            logger.info(f"[Dialogue] News {i+1}: title={news.title[:50]}, processing_status={news.processing_status}, content_len={len(content)}")
 
         lang_instruction = {
             "zh": "用中文生成对话",
