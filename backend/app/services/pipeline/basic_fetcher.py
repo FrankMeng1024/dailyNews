@@ -90,7 +90,11 @@ class BasicFetcherService:
         return all_articles
 
     async def fetch_rss_feeds(self, limit_per_source: int = 10) -> List[Dict[str, Any]]:
-        """从 RSS 源抓取"""
+        """从 RSS 源抓取
+
+        Args:
+            limit_per_source: RSS 总数限制（所有 RSS 源合计）
+        """
         if not VERIFIED_AI_SOURCES:
             logger.info("No verified AI sources configured")
             return []
@@ -105,11 +109,18 @@ class BasicFetcherService:
         if not rss_sources:
             return []
 
+        # 计算每个 RSS 源的限制（平均分配，至少 1 条）
+        per_feed_limit = max(1, limit_per_source // len(rss_sources))
+
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             tasks = [client.get(info["rss_url"]) for _, info in rss_sources]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
 
             for (source_id, info), response in zip(rss_sources, responses):
+                # 检查是否已达到总数限制
+                if len(articles) >= limit_per_source:
+                    break
+
                 if isinstance(response, Exception):
                     logger.warning(f"RSS fetch error for {info['name']}: {response}")
                     continue
@@ -124,11 +135,19 @@ class BasicFetcherService:
 
                     count = 0
                     for entry in feed.entries:
-                        if count >= limit_per_source:
+                        # 检查单源限制和总数限制
+                        if count >= per_feed_limit or len(articles) >= limit_per_source:
                             break
 
                         # 解析发布时间
                         published_at = self._parse_feed_time(entry)
+
+                        # 对于 discussion 类型，检查 AI 相关性（过滤垃圾内容）
+                        if info.get("type") == "discussion":
+                            title = entry.title if hasattr(entry, 'title') else ""
+                            desc = entry.summary if hasattr(entry, 'summary') else ""
+                            if not self.is_ai_related(f"{title} {desc}"):
+                                continue
 
                         # 解析描述
                         description = ""
@@ -136,9 +155,20 @@ class BasicFetcherService:
                             description = entry.summary
                         elif hasattr(entry, 'description'):
                             description = entry.description
+
+                        # 清理 HTML 标签
+                        description_text = ""
                         if description:
                             soup = BeautifulSoup(description, 'html.parser')
-                            description = soup.get_text(strip=True)
+                            description_text = soup.get_text(strip=True)
+
+                        # 对于 rss_content 类型，保存完整内容
+                        fetch_method = info.get("fetch_method", "generic")
+                        if fetch_method == "rss_content" and description_text:
+                            # 保存完整内容，不截断
+                            summary = description_text[:30000]
+                        else:
+                            summary = description_text[:500] if description_text else None
 
                         articles.append({
                             "title": entry.title if hasattr(entry, 'title') else "Untitled",
@@ -146,9 +176,10 @@ class BasicFetcherService:
                             "source_name": info["name"],
                             "source_type": info.get("type", "news"),
                             "published_at": published_at,
-                            "summary": description[:500] if description else None,
+                            "summary": summary,
                             "author": entry.author if hasattr(entry, 'author') else None,
                             "is_verified": info.get("verified", False),
+                            "fetch_method": fetch_method,  # 传递抓取方法
                         })
                         count += 1
 
@@ -157,6 +188,7 @@ class BasicFetcherService:
                 except Exception as e:
                     logger.error(f"RSS parse error for {info['name']}: {e}")
 
+        logger.info(f"RSS total: {len(articles)} articles (limit: {limit_per_source})")
         return articles
 
     async def fetch_hackernews(self, limit: int = 15) -> List[Dict[str, Any]]:

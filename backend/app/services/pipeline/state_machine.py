@@ -2,8 +2,10 @@
 State Machine - 状态机服务
 
 管理新闻处理流水线的任务调度：
-- 使用 asyncio.Queue 作为内存队列
+- 使用 asyncio.PriorityQueue 作为优先级队列
 - 根据 processing_status 分配下一步任务
+- 优先处理影响展示的任务（created/fetching/verifying/translating）
+- refining 任务优先级最低（不影响展示）
 - 支持重启后从数据库恢复未完成任务
 """
 
@@ -16,15 +18,25 @@ from app.models.news import News
 
 logger = logging.getLogger(__name__)
 
+# 状态优先级定义（数字越小优先级越高）
+STATUS_PRIORITY = {
+    'created': 1,      # 新文章，需要尽快处理
+    'fetching': 1,     # 抓取中，需要完成
+    'verifying': 2,    # 验证中
+    'translating': 3,  # 翻译中，完成后可展示
+    'refining': 4,     # 精炼，不影响展示
+}
+
 
 class StateMachineService:
     """状态机服务 - 管理新闻处理流水线"""
 
     def __init__(self):
-        self.queue: asyncio.Queue = asyncio.Queue()
+        self.queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
         self.running: bool = False
         self._worker_task: Optional[asyncio.Task] = None
         self._step_handlers: Dict[str, Callable] = {}
+        self._counter: int = 0  # 用于保证相同优先级时的 FIFO 顺序
 
         # SSE 事件队列（用于实时推送）
         self.event_queues: Dict[str, asyncio.Queue] = {}
@@ -67,15 +79,28 @@ class StateMachineService:
                 pass
         logger.info("State machine stopped")
 
-    async def enqueue(self, news_id: int):
+    async def enqueue(self, news_id: int, status: str = None):
         """
-        将新闻放入处理队列
+        将新闻放入处理队列（带优先级）
 
         Args:
             news_id: 新闻 ID
+            status: 可选的状态，用于确定优先级。如果不提供，从数据库获取
         """
-        await self.queue.put(news_id)
-        logger.debug(f"Enqueued news {news_id}, queue size: {self.queue.qsize()}")
+        if status is None:
+            # 从数据库获取状态
+            db = SessionLocal()
+            try:
+                news = db.query(News).filter(News.id == news_id).first()
+                status = news.processing_status if news else 'refining'
+            finally:
+                db.close()
+
+        priority = STATUS_PRIORITY.get(status, 4)
+        self._counter += 1
+        # 使用 (priority, counter, news_id) 确保相同优先级时按 FIFO 顺序
+        await self.queue.put((priority, self._counter, news_id))
+        logger.debug(f"Enqueued news {news_id} with priority {priority}, queue size: {self.queue.qsize()}")
 
     async def enqueue_batch(self, news_ids: list):
         """
@@ -85,7 +110,7 @@ class StateMachineService:
             news_ids: 新闻 ID 列表
         """
         for news_id in news_ids:
-            await self.queue.put(news_id)
+            await self.enqueue(news_id)
         logger.info(f"Enqueued {len(news_ids)} news items")
 
     async def _recover_pending_tasks(self):
@@ -102,7 +127,7 @@ class StateMachineService:
             if pending:
                 logger.info(f"Recovering {len(pending)} pending tasks")
                 for news in pending:
-                    await self.queue.put(news.id)
+                    await self.enqueue(news.id, news.processing_status)
             else:
                 logger.info("No pending tasks to recover")
 
@@ -118,9 +143,15 @@ class StateMachineService:
             try:
                 # 等待队列中的任务，超时后继续循环检查 running 状态
                 try:
-                    news_id = await asyncio.wait_for(self.queue.get(), timeout=1.0)
+                    item = await asyncio.wait_for(self.queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
                     continue
+
+                # 从优先级队列中解包 (priority, counter, news_id)
+                if isinstance(item, tuple):
+                    _, _, news_id = item
+                else:
+                    news_id = item  # 兼容旧格式
 
                 # 处理任务
                 await self._process(news_id)

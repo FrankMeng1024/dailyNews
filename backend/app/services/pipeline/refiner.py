@@ -2,7 +2,7 @@
 Refiner - 精炼服务
 
 精炼新闻内容，生成中文摘要，处理 refining 状态的新闻
-这是后台增强步骤，不影响展示
+使用三阶段精炼：提取关键信息 → 精炼改写 → 验证校对
 """
 
 import logging
@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class RefinerService:
-    """精炼服务 - 生成精炼内容"""
+    """精炼服务 - 使用三阶段精炼生成高质量内容"""
 
     @ErrorHandler.handle("refining")
     async def refine(self, news_id: int):
         """
-        精炼新闻内容
+        精炼新闻内容（三阶段流程）
 
         Args:
             news_id: 新闻 ID
@@ -54,23 +54,32 @@ class RefinerService:
                 logger.info(f"News {news_id} no content to refine, using summary")
                 return
 
-            # 调用 GLM 精炼
-            refined = await glm_client.refine_content(
+            # 使用三阶段精炼
+            refined = await glm_client.refine_content_three_stage(
                 news.title_zh or news.title,
-                news.original_content
+                news.original_content,
+                news.source_type or "news"
             )
 
             if refined and len(refined) > 100:
                 news.content = refined
                 news.processing_status = 'complete'
                 db.commit()
-                logger.info(f"News {news_id} refined: {len(refined)} chars")
+                logger.info(f"News {news_id} refined (3-stage): {len(refined)} chars")
             else:
-                # 精炼失败，使用原始内容的前 1000 字符
-                news.content = news.original_content[:1000]
+                # 三阶段失败，降级到单次精炼
+                logger.warning(f"News {news_id} 3-stage failed, fallback to single-stage")
+                refined = await glm_client.refine_content(
+                    news.title_zh or news.title,
+                    news.original_content
+                )
+                if refined and len(refined) > 100:
+                    news.content = refined
+                else:
+                    # 精炼失败，使用原始内容的前 1000 字符
+                    news.content = news.original_content[:1000]
                 news.processing_status = 'complete'
                 db.commit()
-                logger.warning(f"News {news_id} refine failed, using truncated original")
 
         finally:
             db.close()

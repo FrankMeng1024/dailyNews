@@ -141,16 +141,65 @@
         .back-btn:hover { background: rgba(102,126,234,0.25); }
         .back-btn:active { transform: scale(0.95); }
         .detail-header-title { flex: 1; font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text2); }
-        .detail-content { padding: 20px 16px; }
-        .detail-title { font-size: 20px; font-weight: 700; line-height: 1.4; margin-bottom: 12px; }
-        .detail-meta { display: flex; gap: 12px; color: var(--text2); font-size: 13px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .detail-text { font-size: 15px; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
+        .detail-content { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
+        .detail-title { font-size: 22px; font-weight: 700; line-height: 1.4; margin-bottom: 12px; letter-spacing: -0.3px; }
+        .detail-meta { display: flex; gap: 8px; color: var(--text2); font-size: 13px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .detail-text { font-size: 16px; line-height: 1.9; color: var(--text); white-space: pre-wrap; letter-spacing: 0.2px; word-break: break-word; overflow-wrap: break-word; }
         .detail-link { display: inline-block; margin-top: 20px; padding: 12px 24px; background: var(--primary-gradient); color: white; border-radius: 20px; text-decoration: none; font-weight: 500; box-shadow: 0 2px 8px rgba(102,126,234,0.3); }
         .detail-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
         .detail-tab { flex: 1; padding: 12px; text-align: center; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s; }
         .detail-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
         .detail-tab:hover { color: var(--primary); }
         .original-content { font-size: 15px; color: var(--text); line-height: 1.7; }
+
+        /* Type-specific header styles */
+        .type-header { padding: 12px 14px; border-radius: 12px; margin-bottom: 16px; }
+        .paper-header { background: linear-gradient(135deg, rgba(82,196,26,0.1), rgba(82,196,26,0.05)); border: 1px solid rgba(82,196,26,0.2); }
+        .discussion-header { background: linear-gradient(135deg, rgba(250,140,22,0.1), rgba(250,140,22,0.05)); border: 1px solid rgba(250,140,22,0.2); }
+        .blog-header { background: linear-gradient(135deg, rgba(89,126,247,0.1), rgba(89,126,247,0.05)); border: 1px solid rgba(89,126,247,0.2); }
+        .news-header { background: linear-gradient(135deg, rgba(24,144,255,0.1), rgba(24,144,255,0.05)); border: 1px solid rgba(24,144,255,0.2); }
+        .type-badge { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+        .type-meta { font-size: 13px; color: var(--text2); }
+
+        /* Paper content formatting */
+        .paper-section { font-weight: 600; font-size: 1.1em; color: var(--primary); margin: 1.5em 0 0.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+        .paper-content p { margin: 0.8em 0; line-height: 1.8; }
+
+        /* Code block styling */
+        .detail-text pre { background: #1e1e1e; border-radius: 8px; padding: 1em; overflow-x: auto; margin: 1em 0; }
+        .detail-text code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9em; }
+        .detail-text pre code { color: #e6e6e6; background: transparent; padding: 0; }
+        .detail-text :not(pre) > code { background: rgba(102,126,234,0.1); color: var(--primary); padding: 2px 6px; border-radius: 4px; }
+
+        /* Discussion/comment styling */
+        .discussion-comment { padding: 1em; border-left: 3px solid var(--primary); margin: 1em 0; background: var(--bg); border-radius: 0 8px 8px 0; }
+        .discussion-reply { margin-left: 1.5em; padding-left: 1em; border-left: 2px solid var(--border); margin-top: 0.8em; }
+        .comment-meta { font-size: 0.85em; color: var(--text2); margin-bottom: 0.5em; display: flex; gap: 8px; align-items: center; }
+        .comment-author { font-weight: 600; color: var(--primary); }
+        .comment-score { color: #f59e0b; }
+        .comment-text { line-height: 1.7; }
+
+        /* Markdown rendered content */
+        .rendered-content { white-space: normal; }
+        .rendered-content h1, .rendered-content h2, .rendered-content h3 { margin: 1.2em 0 0.6em; font-weight: 600; }
+        .rendered-content h1 { font-size: 1.4em; }
+        .rendered-content h2 { font-size: 1.2em; }
+        .rendered-content h3 { font-size: 1.1em; }
+        .rendered-content p { margin: 0.8em 0; }
+        .rendered-content ul, .rendered-content ol { margin: 0.8em 0; padding-left: 1.5em; }
+        .rendered-content li { margin: 0.4em 0; }
+        .rendered-content blockquote { border-left: 3px solid var(--primary); padding-left: 1em; margin: 1em 0; color: var(--text2); }
+        .rendered-content a { color: var(--primary); text-decoration: none; }
+        .rendered-content a:hover { text-decoration: underline; }
+        .type-stats { display: flex; gap: 16px; font-size: 13px; color: var(--text2); margin-top: 6px; }
+        /* Paper abstract block */
+        .paper-abstract { background: rgba(82,196,26,0.05); border-left: 3px solid #52c41a; padding: 12px 16px; margin-bottom: 16px; border-radius: 0 8px 8px 0; font-size: 14px; line-height: 1.6; color: var(--text2); }
+        .paper-abstract-label { font-size: 12px; color: #52c41a; font-weight: 600; margin-bottom: 8px; }
+        /* Card border colors for list */
+        .news-card.type-news { border-left: 3px solid #1890ff; }
+        .news-card.type-blog { border-left: 3px solid #597ef7; }
+        .news-card.type-paper { border-left: 3px solid #52c41a; }
+        .news-card.type-discussion { border-left: 3px solid #fa8c16; }
 
         /* Modal Overlay */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
@@ -477,6 +526,15 @@
             color: #10b981;
         }
     </style>
+    <!-- Markdown 渲染 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 代码高亮 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <!-- 数学公式 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 </head>
 <body>
     <div class="app">
@@ -1472,6 +1530,88 @@
             return colors[sourceType] || colors['news'];
         }
 
+        // Type-specific header for detail page
+        function getTypeSpecificHeader(news) {
+            const type = news.source_type || 'news';
+            const typeColors = {
+                'news': '#1890ff',
+                'blog': '#597ef7',
+                'paper': '#52c41a',
+                'discussion': '#fa8c16'
+            };
+            const typeNames = {
+                'news': '📰 新闻资讯',
+                'blog': '📝 技术博客',
+                'paper': '📄 学术论文',
+                'discussion': '💬 社区讨论'
+            };
+            const color = typeColors[type] || typeColors['news'];
+            const name = typeNames[type] || typeNames['news'];
+
+            switch(type) {
+                case 'paper':
+                    return `<div class="type-header paper-header">
+                        <div class="type-badge" style="color:${color}">${name}</div>
+                        ${news.author ? `<div class="type-meta">👤 ${news.author}</div>` : ''}
+                        ${extractArxivId(news.source_url) ? `<div class="type-meta" style="font-family:monospace;color:${color}">arXiv: ${extractArxivId(news.source_url)}</div>` : ''}
+                    </div>`;
+                case 'discussion':
+                    const stats = parseDiscussionStats(news.summary);
+                    return `<div class="type-header discussion-header">
+                        <div class="type-badge" style="color:${color}">${name}</div>
+                        <div class="type-stats">
+                            <span>🔥 ${stats.score} 热度</span>
+                            <span>💭 ${stats.comments} 评论</span>
+                        </div>
+                    </div>`;
+                case 'blog':
+                    return `<div class="type-header blog-header">
+                        <div class="type-badge" style="color:${color}">${name}</div>
+                        ${news.author ? `<div class="type-meta">✍️ ${news.author}</div>` : ''}
+                    </div>`;
+                default:
+                    return `<div class="type-header news-header">
+                        <div class="type-badge" style="color:${color}">${name}</div>
+                        <div class="type-meta">${news.source_name}</div>
+                    </div>`;
+            }
+        }
+
+        function extractArxivId(url) {
+            if (!url) return null;
+            const match = url.match(/arxiv\.org\/abs\/(\d+\.\d+)/);
+            return match ? match[1] : null;
+        }
+
+        function parseDiscussionStats(summary) {
+            const scoreMatch = summary?.match(/Score:\s*(\d+)/);
+            const commentsMatch = summary?.match(/Comments:\s*(\d+)/);
+            return {
+                score: scoreMatch ? scoreMatch[1] : '0',
+                comments: commentsMatch ? commentsMatch[1] : '0'
+            };
+        }
+
+        function getCardBorderColor(type) {
+            const colors = {
+                'news': '#1890ff',
+                'blog': '#597ef7',
+                'paper': '#52c41a',
+                'discussion': '#fa8c16'
+            };
+            return colors[type] || '#667eea';
+        }
+
+        function getIconGradient(type) {
+            const gradients = {
+                'news': 'linear-gradient(135deg, #1890ff, #096dd9)',
+                'blog': 'linear-gradient(135deg, #597ef7, #2f54eb)',
+                'paper': 'linear-gradient(135deg, #52c41a, #389e0d)',
+                'discussion': 'linear-gradient(135deg, #fa8c16, #d46b08)'
+            };
+            return gradients[type] || 'var(--primary-gradient)';
+        }
+
         function renderNews() {
             const list = document.getElementById('news-list');
             if (!currentNews.length) {
@@ -1486,21 +1626,28 @@
                 const isRefining = n.processing_status === 'refining';
                 const isHot = (n.quality_score || 0) > 0.8;
 
+                // 讨论类型解析热度
+                const discussionStats = sourceType === 'discussion' ? parseDiscussionStats(n.summary) : null;
+                // 估算阅读时间（基于内容长度）
+                const contentLen = (n.content || n.original_content || n.summary || '').length;
+                const readTime = Math.max(1, Math.ceil(contentLen / 500)); // 约500字/分钟
+
                 return `
-                <div class="news-card" onclick="showDetail(${i})">
-                    <div class="news-icon">${icon}</div>
+                <div class="news-card type-${sourceType}" onclick="showDetail(${i})">
+                    <div class="news-icon" style="background:${getIconGradient(sourceType)}">${icon}</div>
                     <div class="news-info">
                         <div class="news-title">${n.title_zh || n.title}</div>
                         <div class="news-meta">
                             <span class="news-source">${n.source_name}</span>
                             <span>·</span>
                             <span class="news-time">${formatRelativeTime(n.published_at)}</span>
+                            ${discussionStats ? `<span style="color:#fa8c16;font-weight:500">🔥${discussionStats.score}</span>` : ''}
+                            ${discussionStats && discussionStats.comments !== '0' ? `<span style="color:var(--text2)">💬${discussionStats.comments}</span>` : ''}
                             ${isVerified ? '<span class="news-tag verified">✓ 已验证</span>' : ''}
-                            ${isRefining ? '<span class="news-tag refining">精炼中</span>' : ''}
                             ${isHot ? '<span class="news-tag hot">热门</span>' : ''}
                         </div>
                     </div>
-                    <div class="news-type-badge">${icon}</div>
+                    <div class="news-read-time" style="font-size:11px;color:var(--text2);white-space:nowrap;margin-left:8px">${readTime}分钟</div>
                 </div>
             `}).join('');
         }
@@ -1566,21 +1713,24 @@
                 isRefining: isRefining
             };
 
+            // 计算阅读时间
+            const contentLen = (refined || original || '').length;
+            const readTime = Math.max(1, Math.ceil(contentLen / 500));
+            // 计算字数
+            const wordCount = (refined || original || '').replace(/\s+/g, '').length;
+
             document.getElementById('detail-body').innerHTML = `
                 <div class="detail-content">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-                        <span style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;${typeColor}">
-                            ${icon} ${typeName}
-                        </span>
-                        ${isVerified ? '<span style="display:inline-flex;align-items:center;padding:3px 8px;background:#f6ffed;color:#52c41a;border-radius:6px;font-size:11px;font-weight:600">✓ 已验证</span>' : ''}
-                        ${isRefining ? '<span style="display:inline-flex;align-items:center;padding:3px 8px;background:rgba(16,185,129,0.15);color:#10b981;border-radius:6px;font-size:11px;font-weight:600">精炼中</span>' : ''}
-                    </div>
+                    ${getTypeSpecificHeader(n)}
                     <div class="detail-title">${n.title_zh || n.title}</div>
+                    ${hasEnglishTitle ? `<div style="font-size:13px;color:var(--text2);margin-bottom:12px;font-style:italic">${n.title}</div>` : ''}
                     <div class="detail-meta">
                         <span class="news-source">${n.source_name}</span>
+                        <span>·</span>
                         <span>${formatRelativeTime(n.published_at)}</span>
-                        ${n.category === 'ai' ? '<span class="badge badge-ai">AI</span>' : ''}
-                        ${n.ai_relevance_score && n.ai_relevance_score > 0.8 ? '<span class="badge" style="background:rgba(52,211,153,0.15);color:#10b981">高相关</span>' : ''}
+                        <span>·</span>
+                        <span style="color:var(--text2)">📖 ${readTime}分钟${wordCount > 100 ? ` · ${wordCount}字` : ''}</span>
+                        ${isVerified ? '<span class="news-tag verified" style="margin-left:4px">✓ 已验证</span>' : ''}
                     </div>
                     <div class="detail-tabs">
                         <div class="detail-tab active" onclick="switchTab('original')">原文</div>
@@ -1588,7 +1738,7 @@
                         ${n.source_url ? `<div class="detail-tab" onclick="switchTab('link')">阅读原文</div>` : ''}
                     </div>
                     <div id="detail-text" class="detail-text">
-                        <div class="original-content">${cleanText(original) || '暂无原文内容'}</div>
+                        <div class="original-content">${renderContent(original, sourceType) || '暂无原文内容'}</div>
                     </div>
                     <div id="detail-link-panel" style="display:none">
                         <div style="padding:14px;background:rgba(102,126,234,0.1);border-radius:14px;border:1px solid rgba(102,126,234,0.2);">
@@ -1604,7 +1754,15 @@
                 </div>
             `;
             document.getElementById('detail-page').classList.add('show');
+            document.getElementById('detail-page').scrollTop = 0; // 重置滚动位置到顶部
             document.body.style.overflow = 'hidden';
+            // 应用 KaTeX 公式渲染（论文类型）
+            if (sourceType === 'paper') {
+                setTimeout(() => {
+                    const textEl = document.getElementById('detail-text');
+                    if (textEl) applyKaTeX(textEl);
+                }, 100);
+            }
         }
 
         function switchTab(type) {
@@ -1624,8 +1782,12 @@
                 linkEl.style.display = 'none';
                 const n = window.currentDetailNews;
                 if (type === 'original') {
-                    const cleanContent = cleanText(window.detailContent.original || '暂无原文内容');
-                    textEl.innerHTML = `<div class="original-content">${cleanContent}</div>`;
+                    const renderedContent = renderContent(window.detailContent.original, n?.source_type) || '暂无原文内容';
+                    textEl.innerHTML = `<div class="original-content">${renderedContent}</div>`;
+                    // 应用 KaTeX 公式渲染
+                    if (n?.source_type === 'paper') {
+                        applyKaTeX(textEl);
+                    }
                 } else {
                     // 精炼内容 - 如果正在精炼中，显示等待提示
                     if (window.detailContent.isRefining) {
@@ -1637,8 +1799,8 @@
                             </div>
                         `;
                     } else {
-                        const cleanContent = cleanText(window.detailContent.refined || '暂无精炼内容');
-                        textEl.innerHTML = `<div class="original-content">${cleanContent}</div>`;
+                        const renderedContent = renderContent(window.detailContent.refined, n?.source_type) || '暂无精炼内容';
+                        textEl.innerHTML = `<div class="original-content">${renderedContent}</div>`;
                     }
                 }
             }
@@ -2255,6 +2417,95 @@
             // Remove excessive <br> tags
             text = text.replace(/(<br>){3,}/g, '<br><br>');
             return text;
+        }
+
+        // 论文内容格式化
+        function renderPaperContent(text) {
+            if (!text) return '';
+            // 章节标题识别
+            const sectionPatterns = [
+                /^(Abstract|摘要)[\s:：]*/gim,
+                /^(\d+\.?\s*)?(Introduction|引言|简介)[\s:：]*/gim,
+                /^(\d+\.?\s*)?(Related Work|相关工作)[\s:：]*/gim,
+                /^(\d+\.?\s*)?(Method|Methods|Methodology|方法)[\s:：]*/gim,
+                /^(\d+\.?\s*)?(Experiment|Experiments|实验)[\s:：]*/gim,
+                /^(\d+\.?\s*)?(Result|Results|结果)[\s:：]*/gim,
+                /^(\d+\.?\s*)?(Discussion|讨论)[\s:：]*/gim,
+                /^(\d+\.?\s*)?(Conclusion|Conclusions|结论)[\s:：]*/gim,
+                /^(\d+\.?\s*)?(References|参考文献)[\s:：]*/gim
+            ];
+            let html = text;
+            sectionPatterns.forEach(pattern => {
+                html = html.replace(pattern, (match) => `\n<h3 class="paper-section">${match.trim()}</h3>\n`);
+            });
+            // 段落处理
+            html = html.split('\n').map(line => {
+                line = line.trim();
+                if (!line) return '';
+                if (line.startsWith('<h3')) return line;
+                return `<p>${line}</p>`;
+            }).join('\n');
+            return `<div class="paper-content rendered-content">${html}</div>`;
+        }
+
+        // Markdown/代码内容渲染
+        function renderMarkdownContent(text) {
+            if (!text) return '';
+            if (typeof marked === 'undefined') return cleanText(text);
+            // 配置 marked
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return code;
+                },
+                breaks: true,
+                gfm: true
+            });
+            const html = marked.parse(text);
+            return `<div class="rendered-content">${html}</div>`;
+        }
+
+        // 讨论内容渲染
+        function renderDiscussionContent(text) {
+            if (!text) return '';
+            // 检测是否是格式化的讨论内容
+            if (text.includes('## 热门讨论') || text.includes('**') && text.includes('·')) {
+                return renderMarkdownContent(text);
+            }
+            return cleanText(text);
+        }
+
+        // 根据类型选择渲染方式
+        function renderContent(text, sourceType) {
+            if (!text) return '';
+            if (sourceType === 'paper') {
+                return renderPaperContent(text);
+            } else if (sourceType === 'discussion') {
+                return renderDiscussionContent(text);
+            } else if (sourceType === 'blog') {
+                // 检测是否包含 Markdown 代码块
+                if (text.includes('```') || text.includes('    ')) {
+                    return renderMarkdownContent(text);
+                }
+            }
+            return cleanText(text);
+        }
+
+        // 渲染后应用 KaTeX 公式
+        function applyKaTeX(element) {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(element, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\[', right: '\\]', display: true},
+                        {left: '\\(', right: '\\)', display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
         }
 
         function copyLink(url) {

@@ -57,12 +57,20 @@ class TranslatorService:
                 await state_machine.enqueue(news_id)
                 return
 
-            # 调用 GLM 翻译
-            context = news.original_content[:500] if news.original_content else ""
-            title_zh = await glm_client.translate(news.title, context)
+            # 获取摘要作为上下文（优先使用 summary，其次 original_content）
+            context = ""
+            if news.summary:
+                context = news.summary[:300]
+            elif news.original_content:
+                context = news.original_content[:300]
+
+            # 调用 GLM 生成中文标题
+            title_zh = await glm_client.generate_chinese_title(news.title, context)
 
             if title_zh and title_zh != news.title:
-                news.title_zh = title_zh[:512]
+                # 清洗标题
+                title_zh = self._clean_title_zh(title_zh, news.title)
+                news.title_zh = title_zh[:100]  # 限制最大长度
                 news.processing_status = 'refining'
                 news.visibility_status = 'active'  # 翻译完成即展示
                 db.commit()
@@ -79,6 +87,53 @@ class TranslatorService:
 
         finally:
             db.close()
+
+    def _clean_title_zh(self, title_zh: str, original_title: str) -> str:
+        """
+        清洗中文标题
+
+        Args:
+            title_zh: GLM 生成的中文标题
+            original_title: 原始英文标题
+
+        Returns:
+            清洗后的中文标题
+        """
+        if not title_zh:
+            return original_title
+
+        # 1. 去除引号、换行、首尾空白（包括中英文引号）
+        title_zh = title_zh.strip().strip('"\'「」『』《》""''')
+
+        # 2. 如果包含换行，只取第一行
+        if '\n' in title_zh:
+            title_zh = title_zh.split('\n')[0].strip()
+
+        # 3. 再次清理可能残留的引号
+        title_zh = title_zh.strip('"\'「」『』《》""''')
+
+        # 4. 如果超过 50 字符，可能混入了正文，需要截断
+        if len(title_zh) > 50:
+            # 尝试在标点处截断
+            for punct in ['。', '，', '；', '：', '——', '—', '|', '\n']:
+                idx = title_zh.find(punct)
+                if 0 < idx < 50:
+                    title_zh = title_zh[:idx]
+                    break
+            else:
+                # 没找到合适的标点，直接截断
+                title_zh = title_zh[:40]
+
+        # 5. 去除可能的前缀
+        for prefix in ['中文标题：', '中文标题:', '标题：', '标题:', '翻译：', '翻译:']:
+            if title_zh.startswith(prefix):
+                title_zh = title_zh[len(prefix):].strip()
+
+        # 6. 如果太短（<5字符），使用原标题
+        if len(title_zh) < 5:
+            return original_title
+
+        return title_zh
 
     def _is_chinese(self, text: str) -> bool:
         """检查文本是否主要是中文"""
